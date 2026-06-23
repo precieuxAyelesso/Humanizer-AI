@@ -848,25 +848,29 @@ app.get("/api/history/:userId", async (req, res) => {
 });
 
 // Serve frontend build or Vite middleware
-async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+if (process.env.VERCEL !== "1") {
+  async function startServer() {
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`[SERVER] Full-stack application running on port ${PORT}`);
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[SERVER] Full-stack application running on port ${PORT}`);
-  });
+  startServer();
 }
 
-startServer();
+export default app;
 
