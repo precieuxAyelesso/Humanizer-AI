@@ -1,0 +1,6 @@
+{
+  "name": "Humanisateur de Texte IA",
+  "description": "Transformez vos textes générés par l'IA en contenus écrits au style humain avec gestion d'abonnements, authentification sécurisée et vérification par SMS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
