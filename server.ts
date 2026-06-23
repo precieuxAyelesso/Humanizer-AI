@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
-import { createServer as createViteServer } from "vite";
+// Vite is dynamically imported only in development mode below
 import { createClient } from "@supabase/supabase-js";
 
 // Load .env then .env.local so local overrides take precedence when present
@@ -855,6 +855,7 @@ app.get("/api/history/:userId", async (req, res) => {
 if (process.env.VERCEL !== "1") {
   async function startServer() {
     if (process.env.NODE_ENV !== "production") {
+      const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: "spa",
