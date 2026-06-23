@@ -14,9 +14,13 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 // Set up directory for persisting data safely in container filesystem (sandbox fallback fallback)
-const DATA_DIR = path.join(process.cwd(), "data");
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR);
+const DATA_DIR = process.env.VERCEL === "1" ? "/tmp" : path.join(process.cwd(), "data");
+try {
+  if (process.env.VERCEL !== "1" && !fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR);
+  }
+} catch (err) {
+  console.error("Failed to create data directory:", err);
 }
 
 const USERS_FILE = path.join(DATA_DIR, "users.json");
