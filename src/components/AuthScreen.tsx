@@ -23,7 +23,6 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
   // 1: Account Info, 2: SMS code verification
   const [authStep, setAuthStep] = useState(1);
   const [verificationCode, setVerificationCode] = useState("");
-  const [sentCode, setSentCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -31,13 +30,6 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
 
   // Temporary container for newly registered user during SMS verification
   const [registeredUser, setRegisteredUser] = useState<any>(null);
-
-  // Mock Google Account Chooser States
-  const [showMockGoogle, setShowMockGoogle] = useState(false);
-  const [mockStep, setMockStep] = useState(1); // 1: Select account, 2: Enter custom email
-  const [customName, setCustomName] = useState("");
-  const [customEmail, setCustomEmail] = useState("");
-  const [mockLoading, setMockLoading] = useState(false);
 
   useEffect(() => {
     let interval: any;
@@ -127,7 +119,11 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
   };
 
   const triggerSendSMS = async (phoneNumber: string, userId: string) => {
+    if (!supabase) {
+      return handleError("Le client de base de données n'est pas initialisé.");
+    }
     setLoading(true);
+    setError("");
     try {
       const smsRes = await fetch("/api/auth/send-sms", {
         method: "POST",
@@ -136,13 +132,21 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
       });
       const smsData = await smsRes.json();
       if (!smsRes.ok) {
-        throw new Error(smsData.error || "Impossible d'envoyer le code SMS.");
+        throw new Error(smsData.error || "Impossible d'enregistrer le numéro de téléphone.");
       }
-      setSentCode(smsData.verificationCode); // For preview simulation convenience
+
+      // Envoi du code OTP réel via le système d'authentification par SMS de Supabase
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: phoneNumber,
+      });
+      if (error) {
+        throw error;
+      }
+
       setSmsTimer(60);
-      handleSuccess("Un code de vérification SMS sécurisé a été transmis par notre passerelle.");
+      handleSuccess("Un code de vérification SMS réel a été envoyé.");
     } catch (err: any) {
-      handleError(err.message);
+      handleError(err.message || "Erreur lors de l'envoi du code SMS.");
     }
   };
 
@@ -151,90 +155,67 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     if (!verificationCode) {
       return handleError("Veuillez saisir le code de vérification reçu.");
     }
+    if (!supabase) {
+      return handleError("Le client de base de données n'est pas initialisé.");
+    }
 
     setLoading(true);
     setError("");
 
     try {
+      // Vérification du code SMS via Supabase Auth
+      const { error } = await supabase.auth.verifyOtp({
+        phone: registeredUser.phone,
+        token: verificationCode,
+        type: "sms",
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // Mise à jour du statut dans notre propre base de données via notre API
       const verifyRes = await fetch("/api/auth/verify-sms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phone: registeredUser.phone,
-          code: verificationCode,
           userId: registeredUser.uid,
         }),
       });
 
       const verifyData = await verifyRes.json();
       if (!verifyRes.ok) {
-        throw new Error(verifyData.error || "Code incorrect.");
+        throw new Error(verifyData.error || "Erreur de validation de l'inscription.");
       }
 
-      // Fully logged in and SMS verified
+      // Entièrement connecté et vérifié
       onLoginSuccess(verifyData.user);
     } catch (err: any) {
-      handleError(err.message);
+      handleError(err.message || "Code SMS incorrect ou expiré.");
     }
   };
 
-  // Real Google OAuth Sign-In via Supabase Auth & Mock fallback
+  // Connexion Google OAuth réelle via Supabase Auth
   const handleGoogleSignIn = async () => {
-    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    
-    // If client ID is present and google accounts library is loaded, try GIS prompt
-    if (googleClientId && (window as any).google?.accounts?.id) {
-      try {
-        (window as any).google.accounts.id.prompt();
-      } catch (err: any) {
-        console.error("GIS Prompt error, falling back to mock:", err);
-        setShowMockGoogle(true);
-      }
-    } else {
-      // Open our premium, simulated Google Account Chooser
-      setShowMockGoogle(true);
+    if (!supabase) {
+      return handleError("Le client de base de données n'est pas initialisé.");
     }
-  };
-
-  // Helper for selecting a Google Account (Real & Mock flows)
-  const handleSelectMockAccount = async (selectedName: string, selectedEmail: string) => {
-    setMockLoading(true);
+    setLoading(true);
     setError("");
-
     try {
-      // Simulate Google server handshake delay (looks extremely realistic)
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const res = await fetch("/api/auth/google", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: selectedName,
-          email: selectedEmail,
-          googleId: "mock_g_" + Math.random().toString(36).substr(2, 9),
-        }),
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin,
+        },
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error);
-      }
-
-      setShowMockGoogle(false);
-      onLoginSuccess(data.user);
+      if (error) throw error;
     } catch (err: any) {
-      handleError(err.message || "Erreur de connexion simulée.");
+      handleError(err.message || "Erreur de connexion Google.");
     } finally {
-      setMockLoading(false);
+      setLoading(false);
     }
-  };
-
-  const handleCustomMockSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!customName || !customEmail) {
-      return handleError("Veuillez remplir tous les champs requis.");
-    }
-    await handleSelectMockAccount(customName, customEmail);
   };
 
   // Load and initialize Google Identity Services client-side dynamically
@@ -641,21 +622,7 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
                     className="w-full bg-white/80 text-slate-850 placeholder-slate-350 tracking-[0.4em] text-xl font-bold text-center rounded-xl p-3 border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
                     required
                   />
-                  <p className="text-[10px] text-slate-400 text-center font-bold mt-1.5">Le code SMS est simulé ci-dessous pour faciliter le test rapide.</p>
                 </div>
-
-                {/* Developer Simulator Box helper */}
-                {sentCode && (
-                  <div className="p-4 bg-emerald-50/60 border border-emerald-500/15 rounded-xl space-y-1.5 shadow-sm">
-                    <div className="flex items-center space-x-1.5">
-                      <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                      <span className="text-[10px] text-emerald-700 font-extrabold font-mono uppercase tracking-wider">Simulateur Passerelle SMS</span>
-                    </div>
-                    <p className="text-[11px] text-slate-650 leading-normal font-medium">
-                      Votre code de vérification SMS sécurisé est : <span className="bg-emerald-100/80 px-2 py-0.5 rounded text-emerald-700 font-black font-mono tracking-wider text-xs border border-emerald-500/20">{sentCode}</span>
-                    </p>
-                  </div>
-                )}
 
                 <button
                   type="submit"
@@ -694,189 +661,7 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
         </div>
       </div>
 
-      {/* Mock Google Account Chooser Modal */}
-      <AnimatePresence>
-        {showMockGoogle && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              transition={{ type: "spring", duration: 0.4 }}
-              className="bg-white rounded-3xl border border-slate-900/[0.06] shadow-2xl max-w-sm w-full overflow-hidden flex flex-col relative"
-            >
-              {/* Google Progress Bar Indicator */}
-              {mockLoading && (
-                <div className="absolute top-0 left-0 right-0 h-1 bg-slate-100 overflow-hidden z-20">
-                  <motion.div
-                    initial={{ left: "-30%" }}
-                    animate={{ left: "100%" }}
-                    transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
-                    className="absolute top-0 bottom-0 bg-blue-500"
-                    style={{ width: "30%" }}
-                  />
-                </div>
-              )}
-
-              {/* Close Button */}
-              <button 
-                type="button"
-                onClick={() => {
-                  if (!mockLoading) {
-                    setShowMockGoogle(false);
-                    setMockStep(1);
-                  }
-                }}
-                disabled={mockLoading}
-                className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100/50 transition-all cursor-pointer disabled:opacity-30"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-
-              <div className="p-8 space-y-6">
-                {/* Header Logo */}
-                <div className="text-center space-y-2">
-                  <div className="flex items-center justify-center space-x-0.5 text-2xl font-bold tracking-tight select-none font-sans">
-                    <span className="text-blue-500">G</span>
-                    <span className="text-red-500">o</span>
-                    <span className="text-yellow-500">o</span>
-                    <span className="text-blue-500">g</span>
-                    <span className="text-green-500">l</span>
-                    <span className="text-red-500">e</span>
-                  </div>
-                  <h3 className="text-md font-bold text-slate-800 font-sans tracking-tight">
-                    {mockStep === 1 ? "Choisissez un compte" : "Associer un compte"}
-                  </h3>
-                  <p className="text-slate-500 text-xs font-medium">
-                    pour continuer vers <span className="text-emerald-600 font-bold font-mono">HUMAN_WRITER</span>
-                  </p>
-                </div>
-
-                {mockStep === 1 ? (
-                  <div className="space-y-3">
-                    {/* Mock Accounts List */}
-                    <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 bg-slate-50/50">
-                      
-                      {/* Account 1 */}
-                      <button
-                        type="button"
-                        onClick={() => handleSelectMockAccount("Jean Dupont", "jean.dupont@gmail.com")}
-                        disabled={mockLoading}
-                        className="w-full p-4 flex items-center space-x-3.5 hover:bg-slate-100/70 transition-colors text-left cursor-pointer disabled:opacity-50"
-                      >
-                        <div className="h-9 w-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-extrabold text-xs shadow-inner uppercase">
-                          JD
-                        </div>
-                        <div className="flex-grow">
-                          <div className="text-xs font-bold text-slate-800">Jean Dupont</div>
-                          <div className="text-[10px] text-slate-500 font-medium">jean.dupont@gmail.com</div>
-                        </div>
-                        <div className="text-[9px] bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full font-bold uppercase border border-emerald-500/20">Démo</div>
-                      </button>
-
-                      {/* Account 2 */}
-                      <button
-                        type="button"
-                        onClick={() => handleSelectMockAccount("Marie Kone", "marie.kone@gmail.com")}
-                        disabled={mockLoading}
-                        className="w-full p-4 flex items-center space-x-3.5 hover:bg-slate-100/70 transition-colors text-left cursor-pointer disabled:opacity-50"
-                      >
-                        <div className="h-9 w-9 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-extrabold text-xs shadow-inner uppercase">
-                          MK
-                        </div>
-                        <div className="flex-grow">
-                          <div className="text-xs font-bold text-slate-800">Marie Kone</div>
-                          <div className="text-[10px] text-slate-500 font-medium">marie.kone@gmail.com</div>
-                        </div>
-                        <div className="text-[9px] bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full font-bold uppercase border border-emerald-500/20">Démo</div>
-                      </button>
-
-                      {/* Use another account */}
-                      <button
-                        type="button"
-                        onClick={() => setMockStep(2)}
-                        disabled={mockLoading}
-                        className="w-full p-4 flex items-center space-x-3.5 hover:bg-slate-100/70 transition-colors text-left cursor-pointer disabled:opacity-50"
-                      >
-                        <div className="h-9 w-9 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-bold border border-slate-200/50">
-                          <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                          </svg>
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-slate-700">Utiliser un autre compte</div>
-                          <div className="text-[10px] text-slate-400 font-medium">Créer ou saisir un autre profil</div>
-                        </div>
-                      </button>
-
-                    </div>
-                  </div>
-                ) : (
-                  /* Custom input step */
-                  <form onSubmit={handleCustomMockSubmit} className="space-y-4">
-                    <div className="space-y-3.5">
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-slate-500 font-bold tracking-wide uppercase">Nom complet</label>
-                        <input
-                          type="text"
-                          value={customName}
-                          onChange={(e) => setCustomName(e.target.value)}
-                          placeholder="Ex: Jean Dupont"
-                          required
-                          className="w-full bg-slate-50 text-slate-800 placeholder-slate-400 text-xs rounded-xl p-3 border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all font-medium"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-slate-500 font-bold tracking-wide uppercase">Adresse email Google</label>
-                        <input
-                          type="email"
-                          value={customEmail}
-                          onChange={(e) => setCustomEmail(e.target.value)}
-                          placeholder="nom@gmail.com"
-                          required
-                          className="w-full bg-slate-50 text-slate-800 placeholder-slate-400 text-xs rounded-xl p-3 border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all font-medium"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setMockStep(1)}
-                        disabled={mockLoading}
-                        className="text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors disabled:opacity-50 cursor-pointer"
-                      >
-                        Retour
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={mockLoading}
-                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 active:scale-97"
-                      >
-                        {mockLoading ? <Loader2 className="h-3 w-3 animate-spin text-white" /> : <span>Se connecter</span>}
-                      </button>
-                    </div>
-                  </form>
-                )}
-
-                {/* Footer terms */}
-                <div className="text-[10px] text-slate-400 leading-relaxed text-center font-medium pt-4 border-t border-slate-100">
-                  Pour continuer, Google partagera votre identité publique avec <span className="font-bold text-slate-700">Human Writer</span>.
-                  Consultez nos <a href="#" className="text-blue-600 hover:underline">Règles de confidentialité</a>.
-                </div>
-
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Layout footer elements */}
     </div>
   );
 }

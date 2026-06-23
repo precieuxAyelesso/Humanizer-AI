@@ -75,8 +75,7 @@ if (supabaseUrl && supabaseKey) {
   console.warn("[SUPABASE] Variables SUPABASE_URL ou SUPABASE_KEY manquantes dans l'environnement. Mode bac à sable local activé.");
 }
 
-// Initializing mock/in-memory SMS codes & user store
-const activeSmsCodes: { [phone: string]: string } = {};
+// Initializing user store fallback
 
 app.use(express.json());
 
@@ -461,16 +460,12 @@ app.post("/api/auth/supabase-callback", async (req, res) => {
   }
 });
 
-// 4. Verification identity SMS: Send code
+// 4. Verification identity SMS: Update phone number in database
 app.post("/api/auth/send-sms", async (req, res) => {
   const { phone, userId } = req.body;
   if (!phone) {
     return res.status(400).json({ error: "Numéro de téléphone requis." });
   }
-
-  // Generate a random 6-digit numeric verification code
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  activeSmsCodes[phone] = code;
 
   // Update user's phone in database
   if (userId) {
@@ -494,88 +489,76 @@ app.post("/api/auth/send-sms", async (req, res) => {
     }
   }
 
-  console.log(`[SMS-GATEWAY-ROUTING] SMS d'authentification envoyé à ${phone}. Code de sécurité: ${code}`);
-
   res.json({
-    message: "Un code de vérification SMS sécurisé a été généré.",
-    verificationCode: code, // Shared in response strictly for demonstration/ease
+    message: "Le numéro de téléphone a été enregistré.",
     phone,
   });
 });
 
-// 5. Verification identity SMS: Verify code
+// 5. Verification identity SMS: Set user as verified in database
 app.post("/api/auth/verify-sms", async (req, res) => {
-  const { phone, code, userId } = req.body;
-  if (!phone || !code) {
-    return res.status(400).json({ error: "Téléphone et code de sécurité requis." });
+  const { phone, userId } = req.body;
+  if (!userId) {
+    return res.status(400).json({ error: "ID d'utilisateur requis." });
   }
-
-  const expectedCode = activeSmsCodes[phone];
-  if (!expectedCode || expectedCode !== code) {
-    return res.status(400).json({ error: "Le code de vérification SMS saisi est incorrect ou a expiré." });
-  }
-
-  // Delete consumed code
-  delete activeSmsCodes[phone];
 
   // Set users as verified in database
-  if (userId) {
-    if (isSupabaseConfigured) {
-      try {
-        const { error } = await supabase
-          .from("users")
-          .update({ is_sms_verified: true })
-          .eq("uid", userId);
+  if (isSupabaseConfigured) {
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({ is_sms_verified: true, phone })
+        .eq("uid", userId);
 
-        if (error) throw error;
+      if (error) throw error;
 
-        // Retrieve verified user information
-        const { data: updatedUser, error: fetchErr } = await supabase
-          .from("users")
-          .select("*")
-          .eq("uid", userId)
-          .single();
+      // Retrieve verified user information
+      const { data: updatedUser, error: fetchErr } = await supabase
+        .from("users")
+        .select("*")
+        .eq("uid", userId)
+        .single();
 
-        if (fetchErr) throw fetchErr;
+      if (fetchErr) throw fetchErr;
 
-        return res.json({
-          message: "Identité vérifiée par SMS avec succès.",
-          user: {
-            uid: updatedUser.uid,
-            name: updatedUser.name,
-            email: updatedUser.email,
-            phone: updatedUser.phone,
-            isSmsVerified: true,
-            isPremium: updatedUser.is_premium,
-          },
-        });
-      } catch (dbErr: any) {
-        console.error("[SUPABASE SMS VERIFY ERROR]", dbErr);
-        return res.status(500).json({ error: `Erreur d'écriture Supabase: ${dbErr.message}` });
-      }
-    } else {
-      const users = readJSONFile(USERS_FILE, []);
-      const userIndex = users.findIndex((u: any) => u.uid === userId);
-      if (userIndex !== -1) {
-        users[userIndex].isSmsVerified = true;
-        writeJSONFile(USERS_FILE, users);
-        
-        return res.json({
-          message: "Identité vérifiée par SMS avec succès.",
-          user: {
-            uid: users[userIndex].uid,
-            name: users[userIndex].name,
-            email: users[userIndex].email,
-            phone: users[userIndex].phone,
-            isSmsVerified: true,
-            isPremium: users[userIndex].isPremium,
-          },
-        });
-      }
+      return res.json({
+        message: "Identité vérifiée par SMS avec succès.",
+        user: {
+          uid: updatedUser.uid,
+          name: updatedUser.name,
+          email: updatedUser.email,
+          phone: updatedUser.phone,
+          isSmsVerified: true,
+          isPremium: updatedUser.is_premium,
+        },
+      });
+    } catch (dbErr: any) {
+      console.error("[SUPABASE SMS VERIFY ERROR]", dbErr);
+      return res.status(500).json({ error: `Erreur d'écriture Supabase: ${dbErr.message}` });
+    }
+  } else {
+    const users = readJSONFile(USERS_FILE, []);
+    const userIndex = users.findIndex((u: any) => u.uid === userId);
+    if (userIndex !== -1) {
+      users[userIndex].isSmsVerified = true;
+      if (phone) users[userIndex].phone = phone;
+      writeJSONFile(USERS_FILE, users);
+      
+      return res.json({
+        message: "Identité vérifiée par SMS avec succès.",
+        user: {
+          uid: users[userIndex].uid,
+          name: users[userIndex].name,
+          email: users[userIndex].email,
+          phone: users[userIndex].phone,
+          isSmsVerified: true,
+          isPremium: users[userIndex].isPremium,
+        },
+      });
     }
   }
 
-  res.json({ message: "Code SMS validé avec succès." });
+  res.status(404).json({ error: "Utilisateur non trouvé." });
 });
 
 // 6. Premium Subscriptions updates
