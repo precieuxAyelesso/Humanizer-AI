@@ -83,6 +83,12 @@ if (supabaseUrl && supabaseUrl.startsWith("http") && supabaseKey) {
 
 app.use(express.json());
 
+// Set COOP header to same-origin-allow-popups to allow Google/Supabase Auth postMessage communication in popups
+app.use((req, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  next();
+});
+
 // Initialize Gemini SDK with telemetry header
 const geminiApiKey = process.env.GEMINI_API_KEY || "";
 let ai: GoogleGenAI | null = null;
