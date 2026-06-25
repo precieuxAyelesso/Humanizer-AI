@@ -91,11 +91,6 @@ if (geminiApiKey) {
   try {
     ai = new GoogleGenAI({
       apiKey: geminiApiKey,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
     });
     console.log("Gemini API Client initialized successfully.");
   } catch (err) {
