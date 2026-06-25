@@ -54,7 +54,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABAS
 let supabase: any = null;
 let isSupabaseConfigured = false;
 
-if (supabaseUrl && supabaseKey) {
+if (supabaseUrl && supabaseUrl.startsWith("http") && supabaseKey) {
   try {
     supabase = createClient(supabaseUrl, supabaseKey);
     isSupabaseConfigured = true;
@@ -855,7 +855,8 @@ app.get("/api/history/:userId", async (req, res) => {
 if (process.env.VERCEL !== "1") {
   async function startServer() {
     if (process.env.NODE_ENV !== "production") {
-      const { createServer: createViteServer } = await import("vite");
+      const viteModule = "vite";
+      const { createServer: createViteServer } = await import(viteModule);
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: "spa",
