@@ -172,16 +172,16 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
         className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-200 overflow-hidden"
       >
         {/* Modal Banner */}
-        <div className="bg-gradient-to-tr from-slate-50 to-white p-6 text-slate-800 border-b border-slate-900/[0.06] relative">
+        <div className="bg-gradient-to-tr from-slate-50 to-white p-4 text-slate-800 border-b border-slate-900/[0.06] relative">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-500/8 pointer-events-none" />
           
           <div className="flex justify-between items-start relative">
             <div>
-              <div className="flex items-center space-x-2 text-emerald-600 font-mono text-[10px] tracking-widest uppercase font-extrabold">
-                <Sparkles className="h-3 w-3" />
+              <div className="flex items-center space-x-2 text-emerald-600 font-mono text-[9px] tracking-widest uppercase font-extrabold">
+                <Sparkles className="h-2.5 w-2.5" />
                 <span>Premium Pass</span>
               </div>
-              <h3 className="text-xl font-extrabold tracking-tight mt-1 text-slate-900">Débloquez l'écriture illimitée</h3>
+              <h3 className="text-lg font-extrabold tracking-tight mt-0.5 text-slate-900">Débloquez l'écriture illimitée</h3>
             </div>
             
             {step !== "processing" && step !== "success" && (
@@ -194,20 +194,20 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
             )}
           </div>
 
-          <div className="mt-6 flex justify-between items-baseline bg-slate-50/80 border border-slate-100 p-4 rounded-2xl relative">
+          <div className="mt-3.5 flex justify-between items-center bg-slate-50/80 border border-slate-100 p-3 rounded-xl relative">
             <div>
-              <div className="text-xs text-slate-500 font-medium font-sans">Abonnement Mensuel Recommandé</div>
-              <div className="text-xs text-slate-650 mt-1 font-semibold">Génération de contenus sémantiques illimitée</div>
+              <div className="text-xs text-slate-500 font-bold font-sans">Abonnement Mensuel Recommandé</div>
+              <div className="text-[10px] text-slate-600 font-medium">Génération sémantique illimitée</div>
             </div>
             <div className="text-right">
-              <span className="text-2xl font-black text-emerald-650">{priceInfo.amount} {priceInfo.symbol}</span>
-              <span className="text-[10px] text-slate-405 font-medium block font-bold">/ mois TTC</span>
+              <span className="text-xl font-black text-emerald-650">{priceInfo.amount} {priceInfo.symbol}</span>
+              <span className="text-[9px] text-slate-500 font-bold block">/ mois TTC</span>
             </div>
           </div>
         </div>
 
         {/* Modal Body changes on step */}
-        <div className="p-6">
+        <div className="p-4">
           <AnimatePresence mode="wait">
             
             {/* Step 1: Selection Form */}
@@ -216,7 +216,7 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="space-y-6"
+                className="space-y-4"
               >
                 {error && (
                   <div className="bg-red-500/10 text-red-650 text-xs p-3 rounded-xl border border-red-500/20 flex items-start space-x-2.5">
@@ -226,40 +226,40 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
                 )}
 
                 {/* Gateway Group Buttons Selector */}
-                <div className="grid grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={() => setMethod("momo")}
-                    className={`p-3.5 rounded-xl border font-bold text-xs flex flex-col items-center space-y-1.5 transition-all cursor-pointer ${
+                    className={`py-2 px-1.5 rounded-xl border font-bold text-[11px] flex flex-col items-center space-y-1 transition-all cursor-pointer ${
                       method === "momo"
                         ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 shadow-md shadow-emerald-500/5"
                         : "border-slate-200 bg-slate-50/50 hover:border-slate-300 text-slate-500"
                     }`}
                   >
-                    <Smartphone className="h-4 w-4" />
+                    <Smartphone className="h-3.5 w-3.5" />
                     <span>Mobile Money</span>
                   </button>
 
                   <button
                     onClick={() => setMethod("card")}
-                    className={`p-3.5 rounded-xl border font-bold text-xs flex flex-col items-center space-y-1.5 transition-all cursor-pointer ${
+                    className={`py-2 px-1.5 rounded-xl border font-bold text-[11px] flex flex-col items-center space-y-1 transition-all cursor-pointer ${
                       method === "card"
                         ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 shadow-md shadow-emerald-500/5"
                         : "border-slate-200 bg-slate-50/50 hover:border-slate-300 text-slate-500"
                     }`}
                   >
-                    <CreditCard className="h-4 w-4" />
+                    <CreditCard className="h-3.5 w-3.5" />
                     <span>Carte Visa/MC</span>
                   </button>
 
                   <button
                     onClick={() => setMethod("stripe")}
-                    className={`p-3.5 rounded-xl border font-bold text-xs flex flex-col items-center space-y-1.5 transition-all cursor-pointer ${
+                    className={`py-2 px-1.5 rounded-xl border font-bold text-[11px] flex flex-col items-center space-y-1 transition-all cursor-pointer ${
                       method === "stripe"
                         ? "border-indigo-500 bg-indigo-500/10 text-indigo-650 shadow-md shadow-indigo-500/5"
                         : "border-slate-200 bg-slate-50/50 hover:border-slate-300 text-slate-500"
                     }`}
                   >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M13.998 2.006c-1.35 0-2.272.69-2.779 1.493-.45-.487-1.127-.852-1.921-.852-1.25 0-2.125.688-2.625 1.5V2.818H3.33v11.834h3.344V9.897c0-2.311 1.092-3.197 2.625-3.197.904 0 1.503.493 1.503 1.579v6.373h3.344V9.897c0-2.311 1.092-3.197 2.625-3.197.904 0 1.503.493 1.503 1.579v6.373h3.344V8.049c0-3.623-1.904-6.043-4.62-6.043z"/>
                     </svg>
                     <span>Stripe Pay</span>
@@ -280,13 +280,13 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
                               key={op.id}
                               type="button"
                               onClick={() => setOperator(op.id as any)}
-                              className={`py-2.5 px-1.5 rounded-xl border text-[11px] text-center font-bold transition-all truncate cursor-pointer ${
+                              className={`py-1.5 px-1 rounded-xl border text-[10px] text-center font-bold transition-all truncate cursor-pointer ${
                                 operator === op.id
                                   ? "border-emerald-500 bg-emerald-500/10 text-slate-900 ring-2 ring-emerald-500/10"
                                   : "border-slate-200 bg-slate-50/50 text-slate-500 hover:border-slate-300"
                               }`}
                             >
-                              <div className={`h-2.5 w-2.5 rounded-full mx-auto mb-1.5 ${op.color} shadow-sm`} />
+                              <div className={`h-2 w-2 rounded-full mx-auto mb-1 ${op.color} shadow-sm`} />
                               {op.name.split(" ")[0]}
                             </button>
                           ))}
@@ -294,16 +294,16 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-slate-555 text-[10px] font-bold tracking-wider uppercase">Numéro de Téléphone Portefeuille</label>
+                        <label className="text-slate-555 text-[9px] font-bold tracking-wider uppercase">Numéro de Téléphone Portefeuille</label>
                         <input
                           type="tel"
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
                           placeholder="+225 07 43 21 09 87"
-                          className="w-full bg-slate-50/80 text-slate-800 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none font-semibold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                          className="w-full bg-slate-50/80 text-slate-800 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none font-semibold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                           required
                         />
-                        <p className="text-[10px] text-slate-400 font-semibold">Spécifiez le numéro disposant des fonds (ex: Orange Money, MTN MoMo, Wave, Moov).</p>
+                        <p className="text-[9px] text-slate-400 font-semibold">Spécifiez le numéro disposant des fonds (ex: Orange, MTN, Wave, Moov).</p>
                       </div>
                     </div>
                   )}
@@ -312,41 +312,41 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
                   {method === "card" && (
                     <div className="space-y-4">
                       <div className="space-y-1.5">
-                        <label className="text-slate-555 text-[10px] font-bold tracking-wider uppercase">Numéro de carte bancaire</label>
+                        <label className="text-slate-555 text-[9px] font-bold tracking-wider uppercase">Numéro de carte bancaire</label>
                         <input
                           type="text"
                           value={cardNumber}
                           onChange={(e) => setCardNumber(e.target.value.replace(/\s?/g, '').replace(/(\d{4})/g, '$1 ').trim())}
                           placeholder="4000 1234 5678 9010"
                           maxLength={19}
-                          className="w-full bg-slate-50/80 text-slate-800 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none font-semibold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all font-mono"
+                          className="w-full bg-slate-50/80 text-slate-800 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none font-semibold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all font-mono"
                           required
                         />
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
-                          <label className="text-slate-555 text-[10px] font-bold tracking-wider uppercase">Expiration</label>
+                          <label className="text-slate-555 text-[9px] font-bold tracking-wider uppercase">Expiration</label>
                           <input
                             type="text"
                             value={cardExpiry}
                             onChange={(e) => setCardExpiry(e.target.value)}
                             placeholder="MM / AA"
                             maxLength={7}
-                            className="w-full bg-slate-50/80 text-slate-800 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none font-semibold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all text-center"
+                            className="w-full bg-slate-50/80 text-slate-800 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none font-semibold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all text-center"
                             required
                           />
                         </div>
 
                         <div className="space-y-1.5">
-                          <label className="text-slate-555 text-[10px] font-bold tracking-wider uppercase">Code CVC / CVV</label>
+                          <label className="text-slate-555 text-[9px] font-bold tracking-wider uppercase">Code CVC / CVV</label>
                           <input
                             type="password"
                             value={cardCvv}
                             onChange={(e) => setCardCvv(e.target.value)}
                             placeholder="123"
                             maxLength={3}
-                            className="w-full bg-slate-50/80 text-slate-800 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none font-semibold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all text-center font-mono"
+                            className="w-full bg-slate-50/80 text-slate-800 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none font-semibold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all text-center font-mono"
                             required
                           />
                         </div>
@@ -356,20 +356,20 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
 
                   {/* Stripe Sub Form */}
                   {method === "stripe" && (
-                    <div className="space-y-3 p-4 bg-indigo-500/[0.02] border border-indigo-500/15 rounded-2xl font-sans">
-                      <div className="flex items-center space-x-2 text-xs text-indigo-600 font-bold mb-2">
-                        <Shield className="h-4 w-4" />
+                    <div className="space-y-3 p-3 bg-indigo-500/[0.02] border border-indigo-500/15 rounded-xl font-sans">
+                      <div className="flex items-center space-x-1.5 text-xs text-indigo-600 font-bold mb-1">
+                        <Shield className="h-3.5 w-3.5" />
                         <span>Paiement International via Stripe</span>
                       </div>
                       
-                      <div className="space-y-1.5">
-                        <label className="text-slate-555 text-[10px] font-bold tracking-wider uppercase">Email de Facturation Stripe</label>
+                      <div className="space-y-1">
+                        <label className="text-slate-555 text-[9px] font-bold tracking-wider uppercase">Email de Facturation Stripe</label>
                         <input
                           type="email"
                           value={stripeEmail}
                           onChange={(e) => setStripeEmail(e.target.value)}
                           placeholder="email@exemple.com"
-                          className="w-full bg-slate-50/80 text-slate-850 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none font-semibold focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
+                          className="w-full bg-slate-50/80 text-slate-855 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none font-semibold focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
                           required
                         />
                       </div>
@@ -377,15 +377,15 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
                   )}
 
                   {/* Terms / Security Badge */}
-                  <div className="flex items-center space-x-2.5 text-[10px] text-slate-400 font-bold my-4 bg-slate-50/50 p-3 rounded-xl border border-slate-100 shadow-inner">
-                    <Shield className="h-4 w-4 text-slate-400 flex-shrink-0" />
-                    <span>Passerelle de paiement chiffrée SSL de bout en bout conforme PCI-DSS v4. Débit récurrent mensuel annulable à tout moment.</span>
+                  <div className="flex items-center space-x-2 text-[9px] text-slate-400 font-bold my-3 bg-slate-50/50 p-2 rounded-lg border border-slate-100 shadow-inner">
+                    <Shield className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                    <span>Paiement sécurisé SSL conforme PCI-DSS. Annulable à tout moment.</span>
                   </div>
 
                   {/* Final pay trigger button */}
                   <button
                     type="submit"
-                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold rounded-xl py-3.5 flex items-center justify-center space-x-2 shadow-lg shadow-emerald-500/15 transition-all cursor-pointer active:scale-98"
+                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold rounded-xl py-2.5 flex items-center justify-center space-x-2 shadow-lg shadow-emerald-500/15 transition-all cursor-pointer active:scale-98"
                   >
                     <span>Payer {priceInfo.amount} {priceInfo.symbol}</span>
                   </button>
