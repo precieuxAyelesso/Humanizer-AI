@@ -346,7 +346,7 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
             <Sparkles className="h-5 w-5 text-white" />
           </div>
           <span className="font-extrabold tracking-tight text-lg text-emerald-600 font-sans">
-            HUMAN_WRITER
+            HUMAN_WRITER <span className="text-emerald-600">by</span> TECHNOVA
           </span>
         </div>
 

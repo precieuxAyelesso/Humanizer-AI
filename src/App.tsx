@@ -70,7 +70,7 @@ export default function App() {
               </div>
               <div>
                 <span className="font-black text-sm tracking-widest text-slate-800 uppercase font-sans">
-                  Human_Writer
+                  Human_Writer by TECHNOVA
                 </span>
                 <span className="text-[9px] text-emerald-600 font-bold block leading-none font-mono tracking-wider">INTELLIGENT REPHRASE</span>
               </div>

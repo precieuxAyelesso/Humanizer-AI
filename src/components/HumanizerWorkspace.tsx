@@ -15,6 +15,47 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   
+  const [priceInfo, setPriceInfo] = useState({ amount: 1961, currency: "XOF", symbol: "F CFA" });
+
+  useEffect(() => {
+    const fetchGeoPricing = async () => {
+      try {
+        const res = await fetch("https://ipapi.co/json/");
+        if (!res.ok) throw new Error("Failed to fetch location");
+        const data = await res.json();
+        const currency = data.currency;
+        
+        if (currency === "XOF" || currency === "XAF") {
+          setPriceInfo({ amount: 1961, currency: currency, symbol: "F CFA" });
+        } else if (currency === "EUR") {
+          setPriceInfo({ amount: 2.99, currency: "EUR", symbol: "€" });
+        } else if (currency === "GBP") {
+          setPriceInfo({ amount: 2.49, currency: "GBP", symbol: "£" });
+        } else if (currency === "CAD") {
+          setPriceInfo({ amount: 3.99, currency: "CAD", symbol: "CA$" });
+        } else {
+          setPriceInfo({ amount: 2.99, currency: "USD", symbol: "$" });
+        }
+      } catch (err) {
+        console.error("Geopricing lookup failed, checking fallback:", err);
+        try {
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          if (tz.includes("Europe")) {
+            setPriceInfo({ amount: 2.99, currency: "EUR", symbol: "€" });
+          } else if (tz.includes("America")) {
+            setPriceInfo({ amount: 2.99, currency: "USD", symbol: "$" });
+          } else {
+            setPriceInfo({ amount: 1961, currency: "XOF", symbol: "F CFA" });
+          }
+        } catch (e) {
+          setPriceInfo({ amount: 1961, currency: "XOF", symbol: "F CFA" });
+        }
+      }
+    };
+    
+    fetchGeoPricing();
+  }, []);
+  
   // Scoring / metrics values
   const [humanityScore, setHumanityScore] = useState<number | null>(null);
   const [changesMade, setChangesMade] = useState<string[]>([]);
@@ -158,7 +199,7 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
               <span>Génération limitée à 200 mots</span>
             </div>
             <p className="text-slate-600 text-xs leading-relaxed max-w-xl font-medium">
-              Votre compte actuel de test de sécurité est limité à 200 mots par texte. Libérez la puissance de calcul maximale et débloquez la génération illimitée pour seulement 500 F CFA par mois.
+              Votre compte actuel de test de sécurité est limité à 200 mots par texte. Libérez la puissance de calcul maximale et débloquez la génération illimitée pour seulement {priceInfo.amount} {priceInfo.symbol} par mois.
             </p>
           </div>
 
@@ -166,7 +207,7 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
             onClick={onTriggerPremiumUpgrade}
             className="relative z-10 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-4.5 py-2.5 rounded-xl transition-all flex items-center space-x-1 cursor-pointer active:scale-97 shadow-md shadow-emerald-500/10"
           >
-            <span>Débloquer pour 500F</span>
+            <span>Débloquer pour {priceInfo.amount}{priceInfo.symbol === "F CFA" ? "F" : " " + priceInfo.symbol}</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
