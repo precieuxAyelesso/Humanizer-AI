@@ -562,7 +562,7 @@ app.post("/api/auth/verify-sms", async (req, res) => {
 
 // 6. Premium Subscriptions updates
 app.post("/api/subscription/create", async (req, res) => {
-  const { userId, paymentMethod, transactionRef } = req.body;
+  const { userId, paymentMethod, transactionRef, amount } = req.body;
   if (!userId) {
     return res.status(400).json({ error: "ID d'utilisateur requis." });
   }
@@ -622,7 +622,7 @@ app.post("/api/subscription/create", async (req, res) => {
     message: "Abonnement Premium activé avec succès ! Merci pour votre confiance.",
     user: updatedUserObj,
     paymentDetails: {
-      amount: "500 CFA",
+      amount: amount || "1961 F CFA",
       period: "Mensuel",
       method: paymentMethod || "Mobile Money",
       ref: transactionRef || "TXN_" + Math.random().toString(36).substr(2, 9).toUpperCase(),

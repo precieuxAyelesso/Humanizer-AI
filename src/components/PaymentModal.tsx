@@ -1,4 +1,4 @@
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { CreditCard, Smartphone, Check, Shield, AlertCircle, Loader2, Sparkles } from "lucide-react";
 
@@ -9,14 +9,54 @@ interface PaymentModalProps {
 }
 
 export default function PaymentModal({ user, onClose, onPaymentSuccess }: PaymentModalProps) {
-  const [method, setMethod] = useState<"momo" | "card" | "paypal">("momo");
+  const [method, setMethod] = useState<"momo" | "card" | "stripe">("momo");
   const [operator, setOperator] = useState<"orange" | "mtn" | "moov" | "wave">("orange");
   const [phone, setPhone] = useState(user.phone || "");
   const [otp, setOtp] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvv, setCardCvv] = useState("");
-  const [paypalEmail, setPaypalEmail] = useState(user.email || "");
+  const [stripeEmail, setStripeEmail] = useState(user.email || "");
+  const [priceInfo, setPriceInfo] = useState({ amount: 1961, currency: "XOF", symbol: "F CFA" });
+
+  useEffect(() => {
+    const fetchGeoPricing = async () => {
+      try {
+        const res = await fetch("https://ipapi.co/json/");
+        if (!res.ok) throw new Error("Failed to fetch location");
+        const data = await res.json();
+        const currency = data.currency;
+        
+        if (currency === "XOF" || currency === "XAF") {
+          setPriceInfo({ amount: 1961, currency: currency, symbol: "F CFA" });
+        } else if (currency === "EUR") {
+          setPriceInfo({ amount: 2.99, currency: "EUR", symbol: "€" });
+        } else if (currency === "GBP") {
+          setPriceInfo({ amount: 2.49, currency: "GBP", symbol: "£" });
+        } else if (currency === "CAD") {
+          setPriceInfo({ amount: 3.99, currency: "CAD", symbol: "CA$" });
+        } else {
+          setPriceInfo({ amount: 2.99, currency: "USD", symbol: "$" });
+        }
+      } catch (err) {
+        console.error("Geopricing lookup failed, checking fallback:", err);
+        try {
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          if (tz.includes("Europe")) {
+            setPriceInfo({ amount: 2.99, currency: "EUR", symbol: "€" });
+          } else if (tz.includes("America")) {
+            setPriceInfo({ amount: 2.99, currency: "USD", symbol: "$" });
+          } else {
+            setPriceInfo({ amount: 1961, currency: "XOF", symbol: "F CFA" });
+          }
+        } catch (e) {
+          setPriceInfo({ amount: 1961, currency: "XOF", symbol: "F CFA" });
+        }
+      }
+    };
+    
+    fetchGeoPricing();
+  }, []);
 
   // Interactive step simulation
   // 'initial', 'processing', 'otp_required', 'success'
@@ -44,6 +84,7 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
           userId: user.uid,
           paymentMethod: paymentType,
           transactionRef: reference,
+          amount: `${priceInfo.amount} ${priceInfo.symbol}`,
         }),
       });
 
@@ -96,16 +137,16 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
         handleCreateSubscription("Carte Internationale (Visa/Mastercard)", ref);
       }, 2500);
 
-    } else if (method === "paypal") {
-      if (!paypalEmail) {
-        return setError("Adresse e-mail de facturation PayPal obligatoire.");
+    } else if (method === "stripe") {
+      if (!stripeEmail) {
+        return setError("Adresse e-mail de facturation Stripe obligatoire.");
       }
       setStep("processing");
 
-      // Simulates secure official PayPal overlay API connection
+      // Simulates secure official Stripe Checkout redirect
       setTimeout(() => {
-        const ref = "PAYPAL_RECEIPT_" + Math.floor(100000 + Math.random() * 900000);
-        handleCreateSubscription("PayPal Account Express", ref);
+        const ref = "STRIPE_CH_TXN_" + Math.floor(100000 + Math.random() * 900000);
+        handleCreateSubscription("Stripe Checkout Express", ref);
       }, 2800);
     }
   };
@@ -159,7 +200,7 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
               <div className="text-xs text-slate-650 mt-1 font-semibold">Génération de contenus sémantiques illimitée</div>
             </div>
             <div className="text-right">
-              <span className="text-2xl font-black text-emerald-650">500 F CFA</span>
+              <span className="text-2xl font-black text-emerald-650">{priceInfo.amount} {priceInfo.symbol}</span>
               <span className="text-[10px] text-slate-405 font-medium block font-bold">/ mois TTC</span>
             </div>
           </div>
@@ -211,18 +252,17 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
                   </button>
 
                   <button
-                    onClick={() => setMethod("paypal")}
+                    onClick={() => setMethod("stripe")}
                     className={`p-3.5 rounded-xl border font-bold text-xs flex flex-col items-center space-y-1.5 transition-all cursor-pointer ${
-                      method === "paypal"
-                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 shadow-md shadow-emerald-500/5"
+                      method === "stripe"
+                        ? "border-indigo-500 bg-indigo-500/10 text-indigo-650 shadow-md shadow-indigo-500/5"
                         : "border-slate-200 bg-slate-50/50 hover:border-slate-300 text-slate-500"
                     }`}
                   >
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M20.03 7.72c0-1.85-.45-3.41-1.35-4.66C17.78 1.8 16.32 1.15 14.31 1.1h-7.1c-.56 0-1.04.42-1.12.98L4.03 15.3c-.04.28.18.52.46.52h3.29l.71-4.52.09-.64a1.07 1.07 0 011.05-.9h2.36c2.39 0 4.25-.51 5.56-1.52.92-.7 1.51-1.63 1.77-2.77.2-.69.29-1.42.29-2.09s-.11-1.3-.29-2.09z"/>
-                      <path opacity=".7" d="M16.92 12.04c-.45 1.57-1.48 2.76-3.08 3.56-1.05.52-2.34.78-3.88.78h-2.1c-.48 0-.89.35-.96.83l-.95 6.01c-.04.28.18.52.46.52h3.45c.48 0 .89-.35.96-.83l.1-.64.71-4.52.09-.64a1.07 1.07 0 011.05-.9c2.37.03 4.22-.48 5.52-1.49a5.9 5.9 0 001.76-2.77c.21-.69.31-1.42.31-2.09a3.8 3.8 0 00-.04-.64c-.33 2.12-1.58 3.96-3.32 5.09z" fill="currentColor"/>
+                      <path d="M13.998 2.006c-1.35 0-2.272.69-2.779 1.493-.45-.487-1.127-.852-1.921-.852-1.25 0-2.125.688-2.625 1.5V2.818H3.33v11.834h3.344V9.897c0-2.311 1.092-3.197 2.625-3.197.904 0 1.503.493 1.503 1.579v6.373h3.344V9.897c0-2.311 1.092-3.197 2.625-3.197.904 0 1.503.493 1.503 1.579v6.373h3.344V8.049c0-3.623-1.904-6.043-4.62-6.043z"/>
                     </svg>
-                    <span>PayPal Account</span>
+                    <span>Stripe Pay</span>
                   </button>
                 </div>
 
@@ -314,22 +354,22 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
                     </div>
                   )}
 
-                  {/* PayPal Sub Form */}
-                  {method === "paypal" && (
-                    <div className="space-y-3 p-4 bg-blue-500/[0.02] border border-blue-500/15 rounded-2xl">
-                      <div className="flex items-center space-x-2 text-xs text-blue-600 font-bold mb-2">
+                  {/* Stripe Sub Form */}
+                  {method === "stripe" && (
+                    <div className="space-y-3 p-4 bg-indigo-500/[0.02] border border-indigo-500/15 rounded-2xl font-sans">
+                      <div className="flex items-center space-x-2 text-xs text-indigo-600 font-bold mb-2">
                         <Shield className="h-4 w-4" />
-                        <span>Connexion PayPal Express Sécurisée</span>
+                        <span>Paiement International via Stripe</span>
                       </div>
                       
                       <div className="space-y-1.5">
-                        <label className="text-slate-555 text-[10px] font-bold tracking-wider uppercase">Email PayPal Facturation</label>
+                        <label className="text-slate-555 text-[10px] font-bold tracking-wider uppercase">Email de Facturation Stripe</label>
                         <input
                           type="email"
-                          value={paypalEmail}
-                          onChange={(e) => setPaypalEmail(e.target.value)}
-                          placeholder="email@paypal.com"
-                          className="w-full bg-slate-50/80 text-slate-800 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none font-semibold focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                          value={stripeEmail}
+                          onChange={(e) => setStripeEmail(e.target.value)}
+                          placeholder="email@exemple.com"
+                          className="w-full bg-slate-50/80 text-slate-850 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none font-semibold focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
                           required
                         />
                       </div>
@@ -347,7 +387,7 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
                     type="submit"
                     className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold rounded-xl py-3.5 flex items-center justify-center space-x-2 shadow-lg shadow-emerald-500/15 transition-all cursor-pointer active:scale-98"
                   >
-                    <span>Payer les 500 F CFA</span>
+                    <span>Payer {priceInfo.amount} {priceInfo.symbol}</span>
                   </button>
                 </form>
               </motion.div>
