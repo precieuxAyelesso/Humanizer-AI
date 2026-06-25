@@ -7,6 +7,7 @@ import { Activity, Sparkles, Star, ShieldAlert } from "lucide-react";
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
+  const [showAuth, setShowAuth] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<{ connected: boolean; mode: string } | null>(null);
@@ -32,11 +33,13 @@ export default function App() {
 
   const handleLoginSuccess = (loggedInUser: any) => {
     setUser(loggedInUser);
+    setShowAuth(false);
     localStorage.setItem("human_writer_session", JSON.stringify(loggedInUser));
   };
 
   const handleLogout = () => {
     setUser(null);
+    setShowAuth(false);
     localStorage.removeItem("human_writer_session");
   };
 
@@ -57,11 +60,16 @@ export default function App() {
     );
   }
 
+  // If there's no logged-in user and we aren't showing auth, we use guest user session
+  const guestUser = { uid: "guest", name: "Visiteur Anonyme", isPremium: false, isGuest: true };
+  const effectiveUser = user || guestUser;
+  const isShowingWorkspace = !user && !showAuth || !!user;
+
   return (
     <div id="app-root-layout" className="min-h-screen bg-brand-bg text-slate-800 flex flex-col justify-between selection:bg-emerald-500/10 selection:text-emerald-600">
       
-      {/* Dynamic top navigation header bar - Only show when user is logged in */}
-      {user && (
+      {/* Dynamic top navigation header bar - Only show when showing workspace */}
+      {isShowingWorkspace && (
         <header className="bg-white/40 border-b border-slate-900/[0.06] backdrop-blur-md py-4 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-0">
             <div className="flex items-center space-x-2.5">
@@ -78,23 +86,28 @@ export default function App() {
 
             <div className="flex items-center flex-wrap gap-2.5 justify-center">
               {/* Premium Status Badge / Free Trial Upgrade Trigger */}
-              {user && (
-                <div className="flex items-center space-x-3 text-xs">
-                  {user.isPremium ? (
-                    <div className="bg-amber-500/10 text-amber-600 border border-amber-500/20 font-extrabold px-3.5 py-1.5 rounded-xl flex items-center space-x-1.5 uppercase tracking-wider text-[10px] shadow-[0_4px_12px_rgba(245,158,11,0.06)]">
-                      <Star className="h-3.5 w-3.5 fill-amber-500/20 text-amber-500" />
-                      <span>Membre Premium</span>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setIsPaymentOpen(true)}
-                      className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 text-emerald-600 font-extrabold border border-emerald-500/20 hover:border-emerald-500/35 px-3.5 py-1.5 rounded-xl transition-all duration-300 cursor-pointer text-[10px] uppercase tracking-widest shadow-inner active:scale-97"
-                    >
-                      🚀 Passer en premium  
-                    </button>
-                  )}
-                </div>
-              )}
+              <div className="flex items-center space-x-3 text-xs">
+                {effectiveUser.isGuest ? (
+                  <button
+                    onClick={() => setShowAuth(true)}
+                    className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-650 hover:to-teal-650 text-white font-extrabold px-3.5 py-1.5 rounded-xl transition-all duration-300 cursor-pointer text-[10px] uppercase tracking-widest shadow-md active:scale-97"
+                  >
+                    Se connecter
+                  </button>
+                ) : effectiveUser.isPremium ? (
+                  <div className="bg-amber-500/10 text-amber-600 border border-amber-500/20 font-extrabold px-3.5 py-1.5 rounded-xl flex items-center space-x-1.5 uppercase tracking-wider text-[10px] shadow-[0_4px_12px_rgba(245,158,11,0.06)]">
+                    <Star className="h-3.5 w-3.5 fill-amber-500/20 text-amber-500" />
+                    <span>Membre Premium</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsPaymentOpen(true)}
+                    className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 text-emerald-600 font-extrabold border border-emerald-500/20 hover:border-emerald-500/35 px-3.5 py-1.5 rounded-xl transition-all duration-300 cursor-pointer text-[10px] uppercase tracking-widest shadow-inner active:scale-97"
+                  >
+                    🚀 Passer en premium  
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </header>
@@ -103,7 +116,7 @@ export default function App() {
       {/* Primary body screen switcher routing pattern */}
       <main className="flex-grow">
         <AnimatePresence mode="wait">
-          {!user ? (
+          {!user && showAuth ? (
             <motion.div
               key="auth-screen"
               initial={{ opacity: 0 }}
@@ -111,7 +124,10 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="min-h-screen"
             >
-              <AuthScreen onLoginSuccess={handleLoginSuccess} />
+              <AuthScreen 
+                onLoginSuccess={handleLoginSuccess} 
+                onBackToWorkspace={() => setShowAuth(false)}
+              />
             </motion.div>
           ) : (
             <motion.div
@@ -122,9 +138,9 @@ export default function App() {
               transition={{ duration: 0.35, ease: "easeOut" }}
             >
               <HumanizerWorkspace
-                user={user}
-                onLogout={handleLogout}
-                onTriggerPremiumUpgrade={() => setIsPaymentOpen(true)}
+                user={effectiveUser}
+                onLogout={effectiveUser.isGuest ? () => setShowAuth(true) : handleLogout}
+                onTriggerPremiumUpgrade={effectiveUser.isGuest ? () => setShowAuth(true) : () => setIsPaymentOpen(true)}
               />
             </motion.div>
           )}

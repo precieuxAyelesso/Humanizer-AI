@@ -5,9 +5,10 @@ import { createClient } from "@supabase/supabase-js";
 
 interface AuthScreenProps {
   onLoginSuccess: (user: any) => void;
+  onBackToWorkspace?: () => void;
 }
 
-export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
+export default function AuthScreen({ onLoginSuccess, onBackToWorkspace }: AuthScreenProps) {
   // Initialize Supabase client
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
   const supabaseKey = import.meta.env.VITE_SUPABASE_KEY || "";
@@ -573,6 +574,17 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
                   {isSignUp ? "Déjà un compte ? Connectez-vous" : "Pas encore inscrit ? Créez un compte gratuitement"}
                 </button>
               </div>
+
+              {onBackToWorkspace && (
+                <div className="text-center mt-4 pt-4 border-t border-slate-100">
+                  <button
+                    onClick={onBackToWorkspace}
+                    className="text-slate-500 hover:text-slate-700 font-bold text-xs transition-colors"
+                  >
+                    ← Retourner à l'éditeur en mode visiteur
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

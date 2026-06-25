@@ -632,7 +632,7 @@ app.post("/api/subscription/create", async (req, res) => {
 
 // 7. Humanize AI content via Gemini API
 app.post("/api/humanize", async (req, res) => {
-  const { text, userId } = req.body;
+  const { text, userId, mode } = req.body;
   if (!text || text.trim().length === 0) {
     return res.status(400).json({ error: "Aucun texte à transformer." });
   }
@@ -673,6 +673,27 @@ app.post("/api/humanize", async (req, res) => {
   let changesArray: string[] = [];
   let score = 95;
 
+  let modeInstruction = "";
+  let modeLabel = "Standard";
+  if (mode === "academic" || mode === "académique") {
+    modeLabel = "Académique";
+    modeInstruction = `
+CONSIGNE SPÉCIFIQUE DU MODE ACADÉMIQUE :
+Adoptez un ton formel, rigoureux et hautement universitaire. Utilisez un vocabulaire soutenu, précis et intellectuellement soigné, parfaitement adapté à un essai, une thèse ou un article scientifique, tout en conservant une structure humaine vivante (variez le rythme des phrases, évitez le jargon robotique creux ou les transitions clichées de l'IA).
+`;
+  } else if (mode === "creative" || mode === "créatif") {
+    modeLabel = "Créatif";
+    modeInstruction = `
+CONSIGNE SPÉCIFIQUE DU MODE CRÉATIF :
+Adoptez un ton engageant, expressif, vivant et percutant. Utilisez des figures de style imagées, un vocabulaire riche, dynamique et évocateur adapté au storytelling, aux articles de blog attrayants ou au copywriting de marketing, tout en conservant un style fluide et naturel qui capte l'intérêt du lecteur.
+`;
+  } else {
+    modeInstruction = `
+CONSIGNE SPÉCIFIQUE DU MODE STANDARD :
+Adoptez un ton professionnel, fluide et équilibré. C'est le style standard d'une rédaction humaine de haute qualité, claire, directe et naturelle, convenant à tous types d'écrits quotidiens ou professionnels.
+`;
+  }
+
   if (!ai) {
     // Sandbox rephrasing fallback when Gemini Key is absent
     const words = text.split(" ");
@@ -685,13 +706,17 @@ app.post("/api/humanize", async (req, res) => {
       return w;
     });
 
-    mockResultText = humanizedWords.join(" ") + "\n\n*(Note de prévisualisation : Clé API Gemini non configurée dans vos variables d'environnement. Reformatage appliqué en mode local).*";
+    mockResultText = humanizedWords.join(" ") + `\n\n*(Note de prévisualisation : Clé API Gemini non configurée dans vos variables d'environnement. Reformatage appliqué en mode local - Style ${modeLabel}).*`;
     score = 88;
-    changesArray = ["Suppression des répétitions automatiques", "Ajustement du rythme des phrases", "Simplification des connecteurs logiques"];
+    changesArray = [
+      `Réécriture locale en style ${modeLabel}`,
+      "Suppression des répétitions automatiques",
+      "Ajustement du rythme des phrases"
+    ];
   } else {
     try {
       const prompt = `
-Vous êtes un rédacteur professionnel humain d'élite et expert en style littéraire. Votre tâche consiste à "humaniser" le texte ci-dessous pour qu'il soit absolument indétectable par les logiciels de détection d'IA (GPTZero, CopyLeaks, etc.) et qu'il se lise avec authenticité, clarté et fluidité humaine.
+Vous êtes un rédacteur professionnel humain d'élite et expert en style littéraire. Votre tâche consiste à "humaniser" le texte ci-dessous pour qu'il soit absolument indétectable par les logiciels de détection d'IA (GPTZero, CopyLeaks, etc.) et qu'il se lise avec authenticity, clarté et fluidité humaine.
 
 Règles impératives à suivre :
 1. Conservez l'intégralité du sens d'origine, des faits et de la structure logique.
@@ -699,6 +724,7 @@ Règles impératives à suivre :
 3. Variez naturellement la longueur des phrases. Écrivez des phrases courtes et percutantes à côté de phrases plus longues et fluides.
 4. Utilisez un français authentique, vivant et naturel. Choisissez des expressions idiomatiques élégantes.
 5. Diminuez le niveau d'académisme stérile au profit d'une voix humaine chaleureuse et captivante.
+${modeInstruction}
 
 Texte généré par l'IA à transformer :
 """
