@@ -60,10 +60,8 @@ export default function App() {
     );
   }
 
-  // If there's no logged-in user and we aren't showing auth, we use guest user session
-  const guestUser = { uid: "guest", name: "Visiteur Anonyme", isPremium: false, isGuest: true };
-  const effectiveUser = user || guestUser;
-  const isShowingWorkspace = !user && !showAuth || !!user;
+  // Render workspace only if user is logged in
+  const isShowingWorkspace = !!user;
 
   return (
     <div id="app-root-layout" className="min-h-screen bg-brand-bg text-slate-800 flex flex-col justify-between selection:bg-emerald-500/10 selection:text-emerald-600">
@@ -87,14 +85,7 @@ export default function App() {
             <div className="flex items-center flex-wrap gap-2.5 justify-center">
               {/* Premium Status Badge / Free Trial Upgrade Trigger */}
               <div className="flex items-center space-x-3 text-xs">
-                {effectiveUser.isGuest ? (
-                  <button
-                    onClick={() => setShowAuth(true)}
-                    className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-650 hover:to-teal-650 text-white font-extrabold px-3.5 py-1.5 rounded-xl transition-all duration-300 cursor-pointer text-[10px] uppercase tracking-widest shadow-md active:scale-97"
-                  >
-                    Se connecter
-                  </button>
-                ) : effectiveUser.isPremium ? (
+                {user.isPremium ? (
                   <div className="bg-amber-500/10 text-amber-600 border border-amber-500/20 font-extrabold px-3.5 py-1.5 rounded-xl flex items-center space-x-1.5 uppercase tracking-wider text-[10px] shadow-[0_4px_12px_rgba(245,158,11,0.06)]">
                     <Star className="h-3.5 w-3.5 fill-amber-500/20 text-amber-500" />
                     <span>Membre Premium</span>
@@ -116,7 +107,7 @@ export default function App() {
       {/* Primary body screen switcher routing pattern */}
       <main className="flex-grow">
         <AnimatePresence mode="wait">
-          {!user && showAuth ? (
+          {!user ? (
             <motion.div
               key="auth-screen"
               initial={{ opacity: 0 }}
@@ -126,7 +117,6 @@ export default function App() {
             >
               <AuthScreen 
                 onLoginSuccess={handleLoginSuccess} 
-                onBackToWorkspace={() => setShowAuth(false)}
               />
             </motion.div>
           ) : (
@@ -138,9 +128,9 @@ export default function App() {
               transition={{ duration: 0.35, ease: "easeOut" }}
             >
               <HumanizerWorkspace
-                user={effectiveUser}
-                onLogout={effectiveUser.isGuest ? () => setShowAuth(true) : handleLogout}
-                onTriggerPremiumUpgrade={effectiveUser.isGuest ? () => setShowAuth(true) : () => setIsPaymentOpen(true)}
+                user={user}
+                onLogout={handleLogout}
+                onTriggerPremiumUpgrade={() => setIsPaymentOpen(true)}
               />
             </motion.div>
           )}

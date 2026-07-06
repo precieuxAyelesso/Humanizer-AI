@@ -58,6 +58,18 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
     fetchGeoPricing();
   }, []);
 
+  // Load KKiaPay SDK dynamically
+  useEffect(() => {
+    const scriptId = "kkiapay-sdk-script";
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement("script");
+      script.id = scriptId;
+      script.src = "https://cdn.kkiapay.me/k.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
   // Interactive step simulation
   // 'initial', 'processing', 'otp_required', 'success'
   const [step, setStep] = useState<"initial" | "processing" | "otp_required" | "success">("initial");
@@ -108,35 +120,80 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
     e.preventDefault();
     setError("");
 
-    if (method === "momo") {
-      if (!phone) {
+    if (method === "momo" || method === "card") {
+      if (method === "momo" && !phone) {
         return setError("Saisissez un numéro Mobile Money valide.");
       }
+
       setStep("processing");
-      
-      // Simulate Mobile Money Africa gateway authorization sequence (takes 3s)
-      setTimeout(() => {
-        if (operator === "orange") {
-          // Orange Money requests OTP codes in many French-speaking countries
-          setStep("otp_required");
-        } else {
-          // MTN, Moov and Wave push USSD notifications directly to phones
-          const ref = "MOMOPUSH_" + Math.floor(100000 + Math.random() * 900000);
-          handleCreateSubscription(`Mobile Money (${operator.toUpperCase()})`, ref);
+
+      try {
+        const win = window as any;
+        if (typeof win.openKkiapayWidget === "undefined") {
+          throw new Error(
+            "Le module de paiement KKiaPay n'a pas pu être chargé. Veuillez rafraîchir la page."
+          );
         }
-      }, 2500);
 
-    } else if (method === "card") {
-      if (!cardNumber || !cardExpiry || !cardCvv) {
-        return setError("Veuillez remplir l'ensemble des informations bancaires.");
+        // Subscribe to success event
+        win.addSuccessListener(async (response: any) => {
+          console.log("KKiaPay payment successful:", response);
+          if (typeof win.closeKkiapayWidget === "function") {
+            win.closeKkiapayWidget();
+          }
+          const transactionId = response.transactionId;
+          await handleCreateSubscription(
+            method === "momo" ? `Mobile Money (KKiaPay)` : "Carte Bancaire (KKiaPay)",
+            transactionId
+          );
+        });
+
+        // Subscribe to failed/closed event
+        win.addFailedListener((err: any) => {
+          console.error("KKiaPay payment failed:", err);
+          if (typeof win.closeKkiapayWidget === "function") {
+            win.closeKkiapayWidget();
+          }
+          setError("Le paiement a échoué ou a été annulé par l'utilisateur.");
+          setStep("initial");
+        });
+
+        // Subscribe to close event
+        if (typeof win.addKkiapayCloseListener === "function") {
+          win.addKkiapayCloseListener(() => {
+            setStep("initial");
+          });
+        }
+
+        // Launch KKiaPay Widget overlay
+        const kkiapayKey = import.meta.env.VITE_KKIAPAY_PUBLIC_KEY;
+        if (!kkiapayKey) {
+          throw new Error(
+            "La clé de paiement publique KKiaPay n'est pas configurée. Veuillez contacter le support technique."
+          );
+        }
+        const isSandbox = import.meta.env.VITE_KKIAPAY_SANDBOX === "true";
+
+        win.openKkiapayWidget({
+          amount: priceInfo.amount,
+          position: "center",
+          key: kkiapayKey,
+          sandbox: isSandbox,
+          name: user.name || "Client HumanWriter",
+          email: user.email || "",
+          phone: method === "momo" ? phone : "",
+          theme: "#10b981", // Emerald green
+          data: JSON.stringify({
+            userId: user.uid,
+            price: priceInfo.amount,
+            currency: priceInfo.currency,
+          }),
+        });
+      } catch (err: any) {
+        console.error("KKiaPay launch error:", err);
+        setError(err.message || "Erreur d'initialisation du widget de paiement.");
+        setStep("initial");
       }
-      setStep("processing");
-
-      setTimeout(() => {
-        const ref = "CARD_" + Math.floor(100000 + Math.random() * 900000);
-        handleCreateSubscription("Carte Internationale (Visa/Mastercard)", ref);
-      }, 2500);
-
     } else if (method === "stripe") {
       if (!stripeEmail) {
         return setError("Adresse e-mail de facturation Stripe obligatoire.");
@@ -308,49 +365,16 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
                     </div>
                   )}
 
-                  {/* Credit Card Sub Form (Visa/MC) */}
+                  {/* Credit Card Sub Form (Visa/MC via KKiaPay) */}
                   {method === "card" && (
-                    <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label className="text-slate-555 text-[9px] font-bold tracking-wider uppercase">Numéro de carte bancaire</label>
-                        <input
-                          type="text"
-                          value={cardNumber}
-                          onChange={(e) => setCardNumber(e.target.value.replace(/\s?/g, '').replace(/(\d{4})/g, '$1 ').trim())}
-                          placeholder="4000 1234 5678 9010"
-                          maxLength={19}
-                          className="w-full bg-slate-50/80 text-slate-800 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none font-semibold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all font-mono"
-                          required
-                        />
+                    <div className="space-y-3 p-3 bg-emerald-500/[0.02] border border-emerald-500/15 rounded-xl font-sans">
+                      <div className="flex items-center space-x-1.5 text-xs text-emerald-600 font-bold mb-1">
+                        <Shield className="h-3.5 w-3.5" />
+                        <span>Paiement par Carte Bancaire via KKiaPay</span>
                       </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <label className="text-slate-555 text-[9px] font-bold tracking-wider uppercase">Expiration</label>
-                          <input
-                            type="text"
-                            value={cardExpiry}
-                            onChange={(e) => setCardExpiry(e.target.value)}
-                            placeholder="MM / AA"
-                            maxLength={7}
-                            className="w-full bg-slate-50/80 text-slate-800 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none font-semibold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all text-center"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="text-slate-555 text-[9px] font-bold tracking-wider uppercase">Code CVC / CVV</label>
-                          <input
-                            type="password"
-                            value={cardCvv}
-                            onChange={(e) => setCardCvv(e.target.value)}
-                            placeholder="123"
-                            maxLength={3}
-                            className="w-full bg-slate-50/80 text-slate-800 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none font-semibold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all text-center font-mono"
-                            required
-                          />
-                        </div>
-                      </div>
+                      <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
+                        Vous allez être redirigé vers le widget de paiement sécurisé de KKiaPay pour saisir vos informations bancaires de manière 100% sécurisée.
+                      </p>
                     </div>
                   )}
 

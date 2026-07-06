@@ -16,6 +16,7 @@ export interface HumanizeHistoryItem {
   wordCount: number;
   originalWordCount: number;
   humanityScore: number;
+  aiProbabilityBefore?: number;
   createdAt: string;
 }
 

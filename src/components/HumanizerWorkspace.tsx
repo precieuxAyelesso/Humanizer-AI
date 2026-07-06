@@ -60,6 +60,7 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
   
   // Scoring / metrics values
   const [humanityScore, setHumanityScore] = useState<number | null>(null);
+  const [aiProbabilityBefore, setAiProbabilityBefore] = useState<number | null>(null);
   const [changesMade, setChangesMade] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useState<HumanizeHistoryItem[]>([]);
@@ -72,14 +73,10 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
   };
 
   const inputWordCount = getWordCount(inputText);
-  const wordLimit = user.isPremium ? Infinity : (user.isGuest ? 100 : 200);
+  const wordLimit = user.isPremium ? Infinity : 200;
 
   // Load history log items for user
   const loadHistory = async () => {
-    if (user.uid === "guest" || user.isGuest) {
-      setHistory([]);
-      return;
-    }
     try {
       const response = await fetch(`/api/history/${user.uid}`);
       if (response.ok) {
@@ -101,22 +98,8 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
     }
 
     if (inputWordCount > wordLimit) {
-      if (user.isGuest) {
-        setError("Les visiteurs sont limités à 100 mots. Veuillez vous connecter pour augmenter la limite.");
-        onTriggerPremiumUpgrade();
-      } else {
-        onTriggerPremiumUpgrade();
-      }
+      onTriggerPremiumUpgrade();
       return;
-    }
-
-    if (user.isGuest) {
-      const anonCount = Number(localStorage.getItem("humanizer_anon_count") || "0");
-      if (anonCount >= 1) {
-        setError("Vous avez atteint la limite de 1 essai gratuit en tant que visiteur. Veuillez créer un compte gratuit pour continuer.");
-        onTriggerPremiumUpgrade();
-        return;
-      }
     }
 
     setLoading(true);
@@ -147,12 +130,10 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
 
       setOutputText(data.humanizedText);
       setHumanityScore(data.humanityScore);
+      setAiProbabilityBefore(data.aiProbabilityBefore !== undefined ? data.aiProbabilityBefore : 95);
       setChangesMade(data.changesMade);
       
-      if (user.isGuest) {
-        const anonCount = Number(localStorage.getItem("humanizer_anon_count") || "0");
-        localStorage.setItem("humanizer_anon_count", String(anonCount + 1));
-      }
+      // User is always registered
 
       // Reload log of actions
       loadHistory();
@@ -176,6 +157,7 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
     setInputText("");
     setOutputText("");
     setHumanityScore(null);
+    setAiProbabilityBefore(null);
     setChangesMade([]);
     setError("");
   };
@@ -222,39 +204,24 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
               </span>
             ) : (
               <span className="inline-flex items-center bg-slate-100 border border-slate-200 text-slate-500 text-[10px] font-bold px-2.5 py-1 rounded-full">
-                {user.isGuest ? "Démonstration" : "Compte Gratuit"}
+                Compte Gratuit
               </span>
             )}
           </div>
           <p className="text-xs text-slate-500 font-medium">
-            {user.isGuest ? (
-              "Mode Visiteur (Essai limité)"
-            ) : (
-              <>Connecté en tant que <span className="text-slate-700 font-bold">{user.name}</span></>
-            )}
+            Connecté en tant que <span className="text-slate-700 font-bold">{user.name}</span>
           </p>
         </div>
 
         <div className="flex items-center space-x-2.5 w-full sm:w-auto">
-          {user.isGuest ? (
-            <button
-              onClick={onLogout}
-              className="p-2.5 text-emerald-600 hover:text-emerald-700 bg-emerald-55/80 hover:bg-emerald-100/90 rounded-xl transition-all text-xs flex items-center justify-center space-x-1.5 cursor-pointer font-bold border border-emerald-200/60 shadow-sm"
-              title="Se connecter / S'inscrire"
-            >
-              <Sparkles className="h-4 w-4 text-emerald-500 fill-emerald-500/10" />
-              <span>Se connecter / S'inscrire</span>
-            </button>
-          ) : (
-            <button
-              onClick={onLogout}
-              className="p-2.5 text-slate-500 hover:text-red-600 bg-white hover:bg-red-50/50 rounded-xl transition-all text-xs flex items-center justify-center space-x-1.5 cursor-pointer font-bold border border-slate-200"
-              title="Se déconnecter"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Déconnexion</span>
-            </button>
-          )}
+          <button
+            onClick={onLogout}
+            className="p-2.5 text-slate-500 hover:text-red-600 bg-white hover:bg-red-50/50 rounded-xl transition-all text-xs flex items-center justify-center space-x-1.5 cursor-pointer font-bold border border-slate-200"
+            title="Se déconnecter"
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="hidden sm:inline">Déconnexion</span>
+          </button>
         </div>
       </div>
 
@@ -266,12 +233,10 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
           <div className="space-y-1 relative z-10">
             <div className="flex items-center space-x-1.5 text-emerald-600 font-bold text-xs">
               <ShieldCheck className="h-4 w-4" />
-              <span>{user.isGuest ? "Mode Démonstration Gratuit (100 mots max)" : `Génération limitée à ${wordLimit} mots`}</span>
+              <span>Génération limitée à {wordLimit} mots</span>
             </div>
             <p className="text-slate-650 text-xs leading-relaxed max-w-xl font-medium">
-              {user.isGuest
-                ? "Essayez notre humanisateur gratuitement (1 essai de 100 mots max). Créez un compte pour passer à 200 mots gratuits ou débloquez l'illimité Premium."
-                : `Votre compte actuel de test de sécurité est limité à ${wordLimit} mots par texte. Libérez la puissance de calcul maximale et débloquez la génération illimitée pour seulement ${priceInfo.amount} ${priceInfo.symbol} par mois.`}
+              Votre compte gratuit actuel est limité à {wordLimit} mots par texte. Libérez la puissance de calcul maximale et débloquez la génération illimitée pour seulement {priceInfo.amount} {priceInfo.symbol} par mois.
             </p>
           </div>
 
@@ -279,7 +244,7 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
             onClick={onTriggerPremiumUpgrade}
             className="relative z-10 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-4.5 py-2.5 rounded-xl transition-all flex items-center space-x-1 cursor-pointer active:scale-97 shadow-md shadow-emerald-500/10"
           >
-            <span>{user.isGuest ? "S'inscrire / Passer Premium" : `Débloquer pour ${priceInfo.amount}${priceInfo.symbol === "F CFA" ? "F" : " " + priceInfo.symbol}`}</span>
+            <span>Débloquer pour {priceInfo.amount}{priceInfo.symbol === "F CFA" ? "F" : " " + priceInfo.symbol}</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -525,9 +490,9 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
                   
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {[
-                      { name: "GPTZero", before: 98, after: Math.max(1, 100 - humanityScore - 1) },
-                      { name: "Copyleaks", before: 95, after: Math.max(2, 100 - humanityScore + 1) },
-                      { name: "Turnitin", before: 99, after: Math.max(1, 100 - humanityScore) },
+                      { name: "GPTZero", before: aiProbabilityBefore !== null ? Math.min(100, Math.max(0, aiProbabilityBefore)) : 98, after: Math.max(1, 100 - (humanityScore || 95) - 1) },
+                      { name: "Copyleaks", before: aiProbabilityBefore !== null ? Math.min(100, Math.max(0, aiProbabilityBefore - 2)) : 95, after: Math.max(2, 100 - (humanityScore || 95) + 1) },
+                      { name: "Turnitin", before: aiProbabilityBefore !== null ? Math.min(100, Math.max(0, aiProbabilityBefore + 1)) : 99, after: Math.max(1, 100 - (humanityScore || 95)) },
                     ].map((det, idx) => (
                       <div key={idx} className="bg-white/80 border border-slate-200/50 rounded-xl p-3.5 space-y-2.5 flex flex-col justify-between shadow-sm">
                         <div className="flex justify-between items-center">
@@ -589,23 +554,12 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
           <h4 className="text-sm font-black text-slate-800">
             Gagnez des crédits de mots gratuits !
           </h4>
-          <p className="text-slate-600 text-xs leading-relaxed font-semibold">
-            {user.isGuest 
-              ? "Créez un compte gratuit pour obtenir votre lien de parrainage unique. Obtenez 500 mots bonus pour chaque ami qui s'inscrit !"
-              : "Partagez votre lien de parrainage avec vos amis. Offrez-leur 200 mots gratuits et recevez 500 mots bonus à chaque nouvelle inscription !"}
+          <p className="text-slate-650 text-xs leading-relaxed font-semibold">
+            Partagez votre lien de parrainage avec vos amis. Offrez-leur 200 mots gratuits et recevez 500 mots bonus à chaque nouvelle inscription !
           </p>
         </div>
 
-        {user.isGuest ? (
-          <button
-            onClick={onLogout} // Triggers login screen
-            className="relative z-10 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-5 py-3 rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer shadow-md active:scale-97"
-          >
-            <span>S'inscrire pour parrainer</span>
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        ) : (
-          <div className="w-full md:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3 relative z-10">
+        <div className="w-full md:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3 relative z-10">
             <div className="flex border border-slate-200 bg-white rounded-xl overflow-hidden shadow-sm flex-grow md:flex-grow-0">
               <input
                 type="text"
@@ -653,7 +607,6 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
               </a>
             </div>
           </div>
-        )}
       </div>
 
       {/* History Log Section */}
@@ -675,6 +628,7 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
                   setInputText(item.originalText);
                   setOutputText(item.humanizedText);
                   setHumanityScore(item.humanityScore);
+                  setAiProbabilityBefore(item.aiProbabilityBefore || 95);
                   setChangesMade(["Suppression des connecteurs répétitifs", "Brise des rimes mécaniques formulées par l'IA"]);
                 }}
                 className="p-4 bg-slate-50/30 hover:bg-white border border-slate-900/[0.04] rounded-2xl cursor-pointer hover:border-emerald-500/40 hover:shadow-md hover:shadow-slate-900/[0.02] transition-all duration-300 space-y-3 flex flex-col justify-between"

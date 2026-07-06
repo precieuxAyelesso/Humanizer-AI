@@ -678,6 +678,7 @@ app.post("/api/humanize", async (req, res) => {
   let mockResultText = "";
   let changesArray: string[] = [];
   let score = 95;
+  let aiProbabilityBefore = 95;
 
   let modeInstruction = "";
   let modeLabel = "Standard";
@@ -719,25 +720,35 @@ Adoptez un ton professionnel, fluide et équilibré. C'est le style standard d'u
       "Suppression des répétitions automatiques",
       "Ajustement du rythme des phrases"
     ];
+    
+    // Fallback heuristic: check if typical AI patterns are present
+    const lowerText = text.toLowerCase();
+    if (lowerText.includes("crucial") || lowerText.includes("robuste") || lowerText.includes("premièrement") || lowerText.includes("de plus") || lowerText.includes("en conclusion") || lowerText.includes("témoigne")) {
+      aiProbabilityBefore = 88;
+    } else {
+      aiProbabilityBefore = 12; // Appears highly human
+    }
   } else {
     try {
       const prompt = `
-Vous êtes un rédacteur professionnel humain d'élite et expert en style littéraire. Votre tâche consiste à "humaniser" le texte ci-dessous pour qu'il soit absolument indétectable par les logiciels de détection d'IA (GPTZero, CopyLeaks, etc.) et qu'il se lise avec authenticity, clarté et fluidité humaine.
+Vous êtes un rédacteur professionnel humain d'élite, expert en style littéraire et en détection de contenu généré par IA. Votre tâche consiste à analyser le texte d'origine ci-dessous pour estimer s'il a été rédigé par une IA, puis à l'« humaniser » pour qu'il soit absolument indétectable par les logiciels de détection d'IA (GPTZero, CopyLeaks, Turnitin, etc.) et qu'il se lise avec authenticité, clarté et fluidité humaine.
 
 Règles impératives à suivre :
-1. Conservez l'intégralité du sens d'origine, des faits et de la structure logique.
-2. Évitez les structures de phrases stéréotypées de l'IA (p. ex., commencer systématiquement par un gérondif, utiliser trop de connecteurs comme "Premièrement", "De plus", "En outre", "Il est crucial de noter", "En conclusion").
-3. Variez naturellement la longueur des phrases. Écrivez des phrases courtes et percutantes à côté de phrases plus longues et fluides.
-4. Utilisez un français authentique, vivant et naturel. Choisissez des expressions idiomatiques élégantes.
-5. Diminuez le niveau d'académisme stérile au profit d'une voix humaine chaleureuse et captivante.
+1. Estimez la probabilité (en pourcentage de 0 à 100) que le texte d'origine fourni ait été écrit par une IA (par exemple, un texte écrit par un humain aura une probabilité faible de 5% à 20%, tandis qu'un texte généré par ChatGPT/Gemini aura une probabilité élevée de 85% à 100%).
+2. Conservez l'intégralité du sens d'origine, des faits et de la structure logique.
+3. Évitez les structures de phrases stéréotypées de l'IA (p. ex., commencer systématiquement par un gérondif, utiliser trop de connecteurs comme "Premièrement", "De plus", "En outre", "Il est crucial de noter", "En conclusion").
+4. Variez naturellement la longueur des phrases. Écrivez des phrases courtes et percutantes à côté de phrases plus longues et fluides.
+5. Utilisez un français authentique, vivant et naturel. Choisissez des expressions idiomatiques élégantes.
+6. Diminuez le niveau d'académisme stérile au profit d'une voix humaine chaleureuse et captivante.
 ${modeInstruction}
 
-Texte généré par l'IA à transformer :
+Texte d'origine à analyser et à transformer :
 """
 ${text}
 """
 
-Renvoie ta réponse au format JSON contenant uniquement trois clés :
+Renvoie ta réponse au format JSON contenant uniquement ces quatre clés :
+- "aiProbabilityBefore": Un entier entre 0 et 100 représentant votre estimation de la probabilité que le texte d'origine fourni ait été écrit par une IA (basé sur le manque de rythme, la répétitivité, les tics de langage caractéristiques des IA, etc.).
 - "humanizedText": Le texte réécrit de façon humaine et fluide.
 - "score": Un entier entre 90 et 99 représentant l'évaluation estimée de son humanité par rapport au texte initial.
 - "changes": Un tableau de 2 ou 3 phrases courtes en français expliquant les optimisations de style menées (p. ex. : "Brise de la monotonie de longueur de phrase", "Remplacement des adverbes artificiels").
@@ -786,6 +797,7 @@ Renvoie ta réponse au format JSON contenant uniquement trois clés :
       mockResultText = parsedData.humanizedText || "";
       score = parsedData.score || 95;
       changesArray = parsedData.changes || ["Réduction de l'académisme structurel", "Instauration de variations de rythme"];
+      aiProbabilityBefore = parsedData.aiProbabilityBefore !== undefined ? Number(parsedData.aiProbabilityBefore) : 95;
 
     } catch (err: any) {
       console.error("Gemini humanize error:", err);
@@ -802,6 +814,7 @@ Renvoie ta réponse au format JSON contenant uniquement trois clés :
     wordCount: mockResultText.trim().split(/\s+/).length,
     originalWordCount: wordCount,
     humanityScore: score,
+    aiProbabilityBefore: aiProbabilityBefore,
     createdAt: new Date().toISOString(),
   };
 
@@ -833,6 +846,7 @@ Renvoie ta réponse au format JSON contenant uniquement trois clés :
     originalWordCount: wordCount,
     humanityScore: score,
     changesMade: changesArray,
+    aiProbabilityBefore: aiProbabilityBefore,
   });
 });
 
