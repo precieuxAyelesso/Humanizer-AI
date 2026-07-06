@@ -132,7 +132,7 @@ app.post("/api/auth/register", async (req, res) => {
     email: cleanEmail,
     password, // Hash or encrypt for production securely
     phone: phone || "",
-    isSmsVerified: false,
+    isSmsVerified: true,
     isPremium: false,
     createdAt: new Date().toISOString(),
   };
@@ -393,7 +393,7 @@ app.post("/api/auth/supabase-callback", async (req, res) => {
           google_id: googleId || null,
           provider: provider || "supabase",
           password: provider === "google" ? `oauth_${provider}_${uid}` : null,
-          is_sms_verified: provider === "google", // Auto-verify for OAuth
+          is_sms_verified: true, // SMS OTP disabled, auto-verify all users
           is_premium: false,
           created_at: new Date().toISOString(),
         }, {
@@ -425,7 +425,7 @@ app.post("/api/auth/supabase-callback", async (req, res) => {
           name: name || users[existingUserIndex].name,
           provider: provider || "supabase",
           googleId: googleId || users[existingUserIndex].googleId,
-          isSmsVerified: provider === "google" || users[existingUserIndex].isSmsVerified,
+          isSmsVerified: true,
         };
       } else {
         // Create new user
@@ -437,7 +437,7 @@ app.post("/api/auth/supabase-callback", async (req, res) => {
           phone: "",
           googleId: googleId || null,
           provider: provider || "supabase",
-          isSmsVerified: provider === "google",
+          isSmsVerified: true,
           isPremium: false,
           createdAt: new Date().toISOString(),
         });
@@ -465,106 +465,7 @@ app.post("/api/auth/supabase-callback", async (req, res) => {
   }
 });
 
-// 4. Verification identity SMS: Update phone number in database
-app.post("/api/auth/send-sms", async (req, res) => {
-  const { phone, userId } = req.body;
-  if (!phone) {
-    return res.status(400).json({ error: "Numéro de téléphone requis." });
-  }
 
-  // Update user's phone in database
-  if (userId) {
-    if (isSupabaseConfigured) {
-      try {
-        const { error } = await supabase
-          .from("users")
-          .update({ phone })
-          .eq("uid", userId);
-        if (error) throw error;
-      } catch (dbErr: any) {
-        console.error("[SUPABASE SMS PHONE UPDATE ERROR]", dbErr);
-      }
-    } else {
-      const users = readJSONFile(USERS_FILE, []);
-      const userIndex = users.findIndex((u: any) => u.uid === userId);
-      if (userIndex !== -1) {
-        users[userIndex].phone = phone;
-        writeJSONFile(USERS_FILE, users);
-      }
-    }
-  }
-
-  res.json({
-    message: "Le numéro de téléphone a été enregistré.",
-    phone,
-  });
-});
-
-// 5. Verification identity SMS: Set user as verified in database
-app.post("/api/auth/verify-sms", async (req, res) => {
-  const { phone, userId } = req.body;
-  if (!userId) {
-    return res.status(400).json({ error: "ID d'utilisateur requis." });
-  }
-
-  // Set users as verified in database
-  if (isSupabaseConfigured) {
-    try {
-      const { error } = await supabase
-        .from("users")
-        .update({ is_sms_verified: true, phone })
-        .eq("uid", userId);
-
-      if (error) throw error;
-
-      // Retrieve verified user information
-      const { data: updatedUser, error: fetchErr } = await supabase
-        .from("users")
-        .select("*")
-        .eq("uid", userId)
-        .single();
-
-      if (fetchErr) throw fetchErr;
-
-      return res.json({
-        message: "Identité vérifiée par SMS avec succès.",
-        user: {
-          uid: updatedUser.uid,
-          name: updatedUser.name,
-          email: updatedUser.email,
-          phone: updatedUser.phone,
-          isSmsVerified: true,
-          isPremium: updatedUser.is_premium,
-        },
-      });
-    } catch (dbErr: any) {
-      console.error("[SUPABASE SMS VERIFY ERROR]", dbErr);
-      return res.status(500).json({ error: `Erreur d'écriture Supabase: ${dbErr.message}` });
-    }
-  } else {
-    const users = readJSONFile(USERS_FILE, []);
-    const userIndex = users.findIndex((u: any) => u.uid === userId);
-    if (userIndex !== -1) {
-      users[userIndex].isSmsVerified = true;
-      if (phone) users[userIndex].phone = phone;
-      writeJSONFile(USERS_FILE, users);
-      
-      return res.json({
-        message: "Identité vérifiée par SMS avec succès.",
-        user: {
-          uid: users[userIndex].uid,
-          name: users[userIndex].name,
-          email: users[userIndex].email,
-          phone: users[userIndex].phone,
-          isSmsVerified: true,
-          isPremium: users[userIndex].isPremium,
-        },
-      });
-    }
-  }
-
-  res.status(404).json({ error: "Utilisateur non trouvé." });
-});
 
 // 6. Premium Subscriptions updates
 app.post("/api/subscription/create", async (req, res) => {

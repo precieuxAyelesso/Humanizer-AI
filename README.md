@@ -8,6 +8,10 @@ This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/481bcaa5-8b7f-4920-bbf3-dd4e6448a54b
 
+## Documentation & Guide Utilisateur
+
+Toutes les fonctionnalités de la plateforme (modes d'écriture, détection d'IA, parrainage, intégration de paiement KKiaPay) et le guide d'utilisation pas-à-pas sont décrits dans le fichier [GUIDE_UTILISATEUR.md](GUIDE_UTILISATEUR.md).
+
 ## Run Locally
 
 **Prerequisites:**  Node.js

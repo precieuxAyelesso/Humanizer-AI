@@ -14,7 +14,7 @@ export default function App() {
 
   // Persistence check on boot
   useEffect(() => {
-    const savedUser = localStorage.getItem("human_writer_session");
+    const savedUser = localStorage.getItem("humanizer_ai_session");
     if (savedUser) {
       try {
         setUser(JSON.parse(savedUser));
@@ -34,18 +34,18 @@ export default function App() {
   const handleLoginSuccess = (loggedInUser: any) => {
     setUser(loggedInUser);
     setShowAuth(false);
-    localStorage.setItem("human_writer_session", JSON.stringify(loggedInUser));
+    localStorage.setItem("humanizer_ai_session", JSON.stringify(loggedInUser));
   };
 
   const handleLogout = () => {
     setUser(null);
     setShowAuth(false);
-    localStorage.removeItem("human_writer_session");
+    localStorage.removeItem("humanizer_ai_session");
   };
 
   const handlePaymentSuccess = (updatedUser: any) => {
     setUser(updatedUser);
-    localStorage.setItem("human_writer_session", JSON.stringify(updatedUser));
+    localStorage.setItem("humanizer_ai_session", JSON.stringify(updatedUser));
   };
 
   if (!authChecked) {
@@ -76,7 +76,7 @@ export default function App() {
               </div>
               <div>
                 <span className="font-black text-sm tracking-widest text-slate-800 uppercase font-sans">
-                  Human_Writer by TECHNOVA
+                  Humanizer_AI by TECHNOVA
                 </span>
                 <span className="text-[9px] text-emerald-600 font-bold block leading-none font-mono tracking-wider">INTELLIGENT REPHRASE</span>
               </div>

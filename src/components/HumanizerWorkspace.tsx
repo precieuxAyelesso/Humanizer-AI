@@ -581,7 +581,7 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
             <div className="flex gap-2">
               <a
                 href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                  `Découvre Human_Writer, l'outil idéal pour humaniser les textes de l'IA et contourner les détecteurs ! Inscris-toi ici : ${window.location.origin}?ref=${user.uid}`
+                  `Découvre Humanizer_AI, l'outil idéal pour humaniser les textes de l'IA et contourner les détecteurs ! Inscris-toi ici : ${window.location.origin}?ref=${user.uid}`
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -594,7 +594,7 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
               </a>
               <a
                 href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-                  `Optimise tes textes de l'IA avec Human_Writer pour qu'ils soient 100% indétectables ! Rejoins-moi ici : ${window.location.origin}?ref=${user.uid}`
+                  `Optimise tes textes de l'IA avec Humanizer_AI pour qu'ils soient 100% indétectables ! Rejoins-moi ici : ${window.location.origin}?ref=${user.uid}`
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
