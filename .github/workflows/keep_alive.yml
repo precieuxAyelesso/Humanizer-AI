@@ -1,0 +1,16 @@
+name: Supabase Database Keep-Alive Ping
+
+on:
+  schedule:
+    # Run every 2 days at 04:00 UTC to keep Supabase database active
+    - cron: '0 4 */2 * *'
+  workflow_dispatch:
+
+jobs:
+  keep_alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase Database Status Endpoint
+        run: |
+          echo "Sending keep-alive request to database..."
+          curl -s -f "https://humanizer-ai.vercel.app/api/db/status" || echo "Ping completed"

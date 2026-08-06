@@ -106,12 +106,23 @@ if (geminiApiKey) {
   console.warn("GEMINI_API_KEY not defined in environment.");
 }
 
-// 0. DB Status Check Endpoint
-app.get("/api/db/status", (req, res) => {
+// 0. DB Status Check & Keep-Alive Ping Endpoint
+app.get("/api/db/status", async (req, res) => {
+  let isAlive = isSupabaseConfigured;
+  if (supabase) {
+    try {
+      // Query Supabase to update activity timer and prevent 7-day auto-pause
+      await supabase.from("users").select("id").limit(1);
+      isAlive = true;
+    } catch (e) {
+      console.error("[SUPABASE PING] Keep-alive ping error:", e);
+    }
+  }
   res.json({
-    connected: isSupabaseConfigured,
+    connected: isAlive,
     url: supabaseUrl ? `${supabaseUrl.substring(0, 15)}...` : null,
-    mode: isSupabaseConfigured ? "Supabase Cloud Database" : "Sandbox Local Fallback (Fichiers JSON supprimés dès que vous connectez Supabase)",
+    mode: isAlive ? "Supabase Cloud Database" : "Sandbox Local Fallback",
+    timestamp: new Date().toISOString(),
   });
 });
 
