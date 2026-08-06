@@ -195,8 +195,9 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
       {/* Header Panel */}
       <div id="workspace-header" className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 bg-white/50 border border-slate-900/[0.06] backdrop-blur-md rounded-2xl shadow-md space-y-4 sm:space-y-0">
         <div className="space-y-1.5">
-          <div className="flex items-center space-x-2.5">
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Espace de Récriture</h1>
+          <div className="flex items-center space-x-3">
+            <img src="/logo.png" alt="HAi Logo" className="h-8 w-8 rounded-lg shadow-sm border border-slate-900/10 object-cover" />
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Espace de Réécriture</h1>
             {user.isPremium ? (
               <span className="inline-flex items-center space-x-1.5 bg-amber-500/10 text-amber-600 text-[10px] font-extrabold tracking-wider uppercase px-2.5 py-1 rounded-full border border-amber-500/20 shadow-[0_4px_12px_rgba(245,158,11,0.06)]">
                 <Star className="h-3 w-3 fill-amber-500" />

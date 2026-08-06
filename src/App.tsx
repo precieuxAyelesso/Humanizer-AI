@@ -70,10 +70,12 @@ export default function App() {
       {isShowingWorkspace && (
         <header className="bg-white/40 border-b border-slate-900/[0.06] backdrop-blur-md py-4 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-0">
-            <div className="flex items-center space-x-2.5">
-              <div className="bg-slate-900/[0.02] border border-slate-900/[0.06] p-2 rounded-xl text-slate-800 flex items-center justify-center shadow-inner">
-                <Sparkles className="h-4.5 w-4.5 text-emerald-500 fill-emerald-500/10" />
-              </div>
+            <div className="flex items-center space-x-3">
+              <img
+                src="/logo.png"
+                alt="Humanizer AI Logo"
+                className="h-9 w-9 rounded-xl shadow-md border border-slate-900/10 object-cover"
+              />
               <div>
                 <span className="font-black text-sm tracking-widest text-slate-800 uppercase font-sans">
                   Humanizer_AI by TECHNOVA

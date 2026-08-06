@@ -224,10 +224,12 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
         <div className="absolute top-0 right-0 w-[450px] h-[450px] bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-[450px] h-[450px] bg-indigo-500/8 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative flex items-center space-x-2.5">
-          <div className="bg-gradient-to-tr from-emerald-600 to-teal-500 p-2 rounded-xl text-white shadow-md">
-            <Sparkles className="h-5 w-5 text-white" />
-          </div>
+        <div className="relative flex items-center space-x-3">
+          <img
+            src="/logo.png"
+            alt="Humanizer AI Logo"
+            className="h-11 w-11 rounded-2xl shadow-lg border border-slate-900/10 object-cover"
+          />
           <span className="font-extrabold tracking-tight text-lg text-emerald-600 font-sans">
             HUMANIZER_AI <span className="text-emerald-600">by</span> TECHNOVA
           </span>
