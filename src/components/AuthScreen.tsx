@@ -227,11 +227,11 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
         <div className="relative flex items-center space-x-3">
           <img
             src="/logo.png"
-            alt="Humanizer AI Logo"
+            alt="Humaniser Logo"
             className="h-11 w-11 rounded-2xl shadow-lg border border-slate-900/10 object-cover"
           />
           <span className="font-extrabold tracking-tight text-lg text-emerald-600 font-sans">
-            HUMANIZER_AI <span className="text-emerald-600">by</span> TECHNOVA
+            HUMANISER <span className="text-emerald-600">by</span> TECHNOVA
           </span>
         </div>
 
@@ -241,7 +241,7 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
               Transformez l'IA en écriture <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">humaine</span>.
             </h1>
             <p className="text-slate-650 text-sm leading-relaxed font-medium">
-              Dites adieu aux détecteurs automatisés. Obtenez instantanément des textes réécrits de manière vivante, intelligente et authentique.
+              <strong>Objectif de l'application :</strong> Humaniser est un outil conçu pour réécrire vos textes générés par intelligence artificielle afin de les rendre naturels et indétectables.
             </p>
           </div>
 
@@ -251,8 +251,8 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
                 <ShieldCheck className="h-4 w-4 text-emerald-600" />
               </div>
               <div>
-                <h4 className="text-slate-850 text-sm font-bold">Rend vos textes 100% Humains</h4>
-                <p className="text-slate-500 text-xs mt-0.5 leading-relaxed font-medium">Formatage sémantique unique pour contourner les principaux filtres IA du marché.</p>
+                <h4 className="text-slate-850 text-sm font-bold">Pourquoi se connecter ?</h4>
+                <p className="text-slate-500 text-xs mt-0.5 leading-relaxed font-medium">La création d'un compte (via Google ou Email) est requise pour sécuriser votre historique de textes, lier vos documents à votre espace personnel et gérer votre abonnement premium.</p>
               </div>
             </div>
           </div>
