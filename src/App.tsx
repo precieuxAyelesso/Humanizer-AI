@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import AuthScreen from "./components/AuthScreen";
 import HumanizerWorkspace from "./components/HumanizerWorkspace";
 import PaymentModal from "./components/PaymentModal";
+import { PrivacyPolicy, TermsOfService } from "./components/LegalPages";
 import { Activity, Sparkles, Star, ShieldAlert } from "lucide-react";
 
 export default function App() {
@@ -58,6 +59,15 @@ export default function App() {
         <span className="text-[10px] font-extrabold text-emerald-600 font-mono tracking-widest uppercase animate-pulse">Chargement sécurisé...</span>
       </div>
     );
+  }
+
+  // Simple routing for legal pages
+  const path = window.location.pathname;
+  if (path === '/privacy') {
+    return <PrivacyPolicy />;
+  }
+  if (path === '/terms') {
+    return <TermsOfService />;
   }
 
   // Render workspace only if user is logged in

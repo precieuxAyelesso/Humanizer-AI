@@ -258,8 +258,12 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
           </div>
         </div>
 
-        <div className="relative text-xs text-slate-400 font-mono tracking-wider font-semibold">
-          © {new Date().getFullYear()} HUMANIZER_AI | ÉPURE & SÉCURISÉ | made by TECHNOVA
+        <div className="relative text-xs text-slate-400 font-mono tracking-wider font-semibold flex flex-col gap-2">
+          <span>© {new Date().getFullYear()} HUMANIZER_AI | ÉPURE & SÉCURISÉ | made by TECHNOVA</span>
+          <div className="flex gap-4 font-sans text-slate-500">
+            <a href="/privacy" className="hover:text-emerald-600 transition-colors underline decoration-slate-300 hover:decoration-emerald-600 underline-offset-2">Confidentialité</a>
+            <a href="/terms" className="hover:text-emerald-600 transition-colors underline decoration-slate-300 hover:decoration-emerald-600 underline-offset-2">Conditions</a>
+          </div>
         </div>
       </div>
 
