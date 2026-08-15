@@ -36,28 +36,32 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
   const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
     if (!name || !email || !password) {
-      return handleError("VIllisez remplir tous les champs requis.");
+      return handleError("Veuillez remplir tous les champs requis.");
     }
+    if (!supabase) return handleError("Erreur de configuration base de données.");
 
     setLoading(true);
     setError("");
 
     try {
-      const regRes = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, phone: "" }),
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: name
+          }
+        }
       });
-
-      const regData = await regRes.json();
-      if (!regRes.ok) {
-        throw new Error(regData.error || "Une erreur est survenue lors de l'inscription.");
+      if (error) throw error;
+      
+      if (!data.session) {
+        setSuccess("Inscription réussie. Veuillez vérifier votre boîte mail si nécessaire.");
+        setLoading(false);
       }
-
-      // Successful registration, login immediately!
-      onLoginSuccess(regData.user);
+      // Si une session est créée, le onAuthStateChange la captera.
     } catch (err: any) {
-      handleError(err.message);
+      handleError(err.message || "Une erreur est survenue lors de l'inscription.");
     }
   };
 
@@ -66,25 +70,21 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     if (!email || !password) {
       return handleError("Veuillez saisir votre email et votre mot de passe.");
     }
+    if (!supabase) return handleError("Erreur de configuration base de données.");
 
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Identifiants invalides.");
-      }
-
-      onLoginSuccess(data.user);
+      if (error) throw error;
+      // Le onAuthStateChange s'occupera du reste
     } catch (err: any) {
-      handleError(err.message);
+      handleError("Identifiants invalides.");
     }
   };
 
@@ -185,10 +185,13 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         try {
-          // Fetch or create user profile in our database
+          // Fetch or create user profile in our database, securely passing the JWT
           const res = await fetch("/api/auth/supabase-callback", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${session.access_token}`
+            },
             body: JSON.stringify({
               uid: session.user.id,
               email: session.user.email,
@@ -203,10 +206,17 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
             throw new Error(data.error);
           }
 
+          // Attach token to user object for subsequent API calls
+          const userWithToken = {
+            ...data.user,
+            token: session.access_token
+          };
+
           // Login successful
-          onLoginSuccess(data.user);
+          onLoginSuccess(userWithToken);
         } catch (err: any) {
           console.error("Error processing Supabase auth:", err);
+          handleError("Erreur lors de l'initialisation de la session sécurisée.");
         }
       }
     });

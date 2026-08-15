@@ -128,263 +128,45 @@ app.get("/api/db/status", async (req, res) => {
 
 // REST API Endpoints
 
-// 1. Auth: User Registration
-app.post("/api/auth/register", async (req, res) => {
-  const { name, email, password, phone } = req.body;
-  if (!name || !email || !password) {
-    return res.status(400).json({ error: "Tous les champs obligatoires (nom, email, mot de passe) doivent être remplis." });
+// Middleware to verify Supabase JWT
+const authMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Non autorisé. Jeton d'authentification manquant." });
   }
 
-  const cleanEmail = email.toLowerCase();
-  const uid = "usr_" + Math.random().toString(36).substr(2, 9);
-  const newUser = {
-    uid,
-    name,
-    email: cleanEmail,
-    password, // Hash or encrypt for production securely
-    phone: phone || "",
-    isSmsVerified: true,
-    isPremium: false,
-    createdAt: new Date().toISOString(),
-  };
+  const token = authHeader.split(" ")[1];
 
   if (isSupabaseConfigured) {
     try {
-      // Check duplicate on Supabase
-      const { data: existingUser, error: checkError } = await supabase
-        .from("users")
-        .select("email")
-        .eq("email", cleanEmail)
-        .maybeSingle();
-
-      if (checkError) throw checkError;
-      if (existingUser) {
-        return res.status(400).json({ error: "Cet email est déjà utilisé par un autre compte Supabase." });
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      if (error || !user) {
+        return res.status(401).json({ error: "Non autorisé. Jeton invalide ou expiré." });
       }
-
-      // Save user to Supabase
-      const { error: insertError } = await supabase
-        .from("users")
-        .insert([{
-          uid: newUser.uid,
-          name: newUser.name,
-          email: newUser.email,
-          password: newUser.password,
-          phone: newUser.phone,
-          is_sms_verified: newUser.isSmsVerified,
-          is_premium: newUser.isPremium,
-          created_at: newUser.createdAt
-        }]);
-
-      if (insertError) throw insertError;
-    } catch (dbErr: any) {
-      console.error("[SUPABASE REGISTER ERROR]", dbErr);
-      return res.status(550).json({ error: `Erreur base de données Supabase: ${dbErr.message || dbErr}` });
+      // Attach the secure verified user ID to the request
+      (req as any).secureUserId = user.id;
+      next();
+    } catch (err) {
+      return res.status(401).json({ error: "Erreur lors de la vérification de l'autorisation." });
     }
   } else {
-    // Sandbox local file storage fallback (Automatically deleted on DB connected)
-    const users = readJSONFile(USERS_FILE, []);
-    if (users.some((u: any) => u.email.toLowerCase() === cleanEmail)) {
-      return res.status(400).json({ error: "Cet email est déjà utilisé par un autre compte." });
-    }
-    users.push(newUser);
-    writeJSONFile(USERS_FILE, users);
+    // Mode bac à sable local : pas de sécurité
+    (req as any).secureUserId = req.body.userId || "local_user";
+    next();
   }
+};
+// L'inscription et la connexion classiques et Google se font désormais entièrement côté client via Supabase Auth pour des raisons de sécurité.
 
-  res.status(201).json({
-    message: "Inscription réussie.",
-    user: {
-      uid: newUser.uid,
-      name: newUser.name,
-      email: newUser.email,
-      phone: newUser.phone,
-      isSmsVerified: newUser.isSmsVerified,
-      isPremium: newUser.isPremium,
-    },
-  });
-});
+// 3.5 Supabase Auth Callback: Handle user after OAuth or Native Auth
 
-// 2. Auth: User Login
-app.post("/api/auth/login", async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email et mot de passe sont requis." });
-  }
-
-  const cleanEmail = email.toLowerCase();
-  let user: any = null;
-
-  if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("email", cleanEmail)
-        .eq("password", password)
-        .maybeSingle();
-
-      if (error) throw error;
-      if (data) {
-        user = {
-          uid: data.uid,
-          name: data.name,
-          email: data.email,
-          phone: data.phone || "",
-          isSmsVerified: data.is_sms_verified,
-          isPremium: data.is_premium,
-        };
-      }
-    } catch (dbErr: any) {
-      console.error("[SUPABASE LOGIN ERROR]", dbErr);
-      return res.status(500).json({ error: `Erreur d'authentification Supabase: ${dbErr.message}` });
-    }
-  } else {
-    const users = readJSONFile(USERS_FILE, []);
-    const matching = users.find(
-      (u: any) => u.email.toLowerCase() === cleanEmail && u.password === password
-    );
-    if (matching) {
-      user = {
-        uid: matching.uid,
-        name: matching.name,
-        email: matching.email,
-        phone: matching.phone || "",
-        isSmsVerified: matching.isSmsVerified,
-        isPremium: matching.isPremium,
-      };
-    }
-  }
-
-  if (!user) {
-    return res.status(401).json({ error: "Email ou mot de passe incorrect." });
-  }
-
-  res.json({
-    message: "Connexion réussie.",
-    user,
-  });
-});
-
-// 3. Auth: Google Login Integration (Simulated OAuth and auto-registration)
-app.post("/api/auth/google", async (req, res) => {
-  const { name, email, googleId } = req.body;
-  if (!email || !name) {
-    return res.status(400).json({ error: "Informations de connexion Google manquantes." });
-  }
-
-  const cleanEmail = email.toLowerCase();
-  let user: any = null;
-
-  if (isSupabaseConfigured) {
-    try {
-      // Find existing user by email
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("email", cleanEmail)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data) {
-        user = {
-          uid: data.uid,
-          name: data.name,
-          email: data.email,
-          phone: data.phone || "",
-          isSmsVerified: true, // Google login auto-verifies
-          isPremium: data.is_premium,
-        };
-        // Update database if it wasn't verified
-        if (!data.is_sms_verified) {
-          await supabase
-            .from("users")
-            .update({ is_sms_verified: true })
-            .eq("uid", data.uid);
-        }
-      } else {
-        // User does not exist, auto-create on Supabase
-        const uniqueUid = "usr_g_" + (googleId || Math.random().toString(36).substr(2, 9));
-        user = {
-          uid: uniqueUid,
-          name,
-          email: cleanEmail,
-          phone: "",
-          isSmsVerified: true, // Google accounts should be pre-verified
-          isPremium: false,
-          createdAt: new Date().toISOString(),
-        };
-
-        const { error: insertError } = await supabase
-          .from("users")
-          .insert([{
-            uid: user.uid,
-            name: user.name,
-            email: user.email,
-            password: "google_login_secured_" + Math.random().toString(36).substr(2, 5),
-            phone: user.phone,
-            is_sms_verified: true, // Auto-verify on insert
-            is_premium: user.isPremium,
-            created_at: user.createdAt
-          }]);
-
-        if (insertError) throw insertError;
-      }
-    } catch (dbErr: any) {
-      console.error("[SUPABASE GOOGLE ERROR]", dbErr);
-      return res.status(500).json({ error: `Erreur de connexion Google Supabase: ${dbErr.message}` });
-    }
-  } else {
-    // Falls back to json list
-    const users = readJSONFile(USERS_FILE, []);
-    const matchingIndex = users.findIndex((u: any) => u.email.toLowerCase() === cleanEmail);
-
-    if (matchingIndex !== -1) {
-      const matching = users[matchingIndex];
-      user = {
-        uid: matching.uid,
-        name: matching.name,
-        email: matching.email,
-        phone: matching.phone || "",
-        isSmsVerified: true,
-        isPremium: matching.isPremium,
-      };
-      
-      // Update in local file
-      if (!matching.isSmsVerified) {
-        users[matchingIndex].isSmsVerified = true;
-        writeJSONFile(USERS_FILE, users);
-      }
-    } else {
-      user = {
-        uid: "usr_g_" + (googleId || Math.random().toString(36).substr(2, 9)),
-        name,
-        email: cleanEmail,
-        phone: "",
-        isSmsVerified: true, // Google accounts are pre-verified
-        isPremium: false,
-        createdAt: new Date().toISOString(),
-      };
-      
-      const completeRecord = {
-        ...user,
-        password: "google_login_secured_" + Math.random().toString(36).substr(2, 5),
-      };
-      users.push(completeRecord);
-      writeJSONFile(USERS_FILE, users);
-    }
-  }
-
-  res.json({
-    message: "Connexion Google réussie.",
-    user,
-  });
-});
-
-// 3.5 Supabase Auth Callback: Handle user after OAuth
-app.post("/api/auth/supabase-callback", async (req, res) => {
+app.post("/api/auth/supabase-callback", authMiddleware, async (req, res) => {
   const { uid, email, name, provider, googleId } = req.body;
+  const secureUserId = (req as any).secureUserId;
   
+  if (isSupabaseConfigured && uid !== secureUserId) {
+    return res.status(403).json({ error: "Incohérence d'identité détectée." });
+  }
+
   if (!uid || !email) {
     return res.status(400).json({ error: "UID et email requis." });
   }
@@ -479,8 +261,10 @@ app.post("/api/auth/supabase-callback", async (req, res) => {
 
 
 // 6. Premium Subscriptions updates
-app.post("/api/subscription/create", async (req, res) => {
-  const { userId, paymentMethod, transactionRef, amount } = req.body;
+app.post("/api/subscription/create", authMiddleware, async (req, res) => {
+  const { paymentMethod, transactionRef, amount } = req.body;
+  const userId = (req as any).secureUserId;
+  
   if (!userId) {
     return res.status(400).json({ error: "ID d'utilisateur requis." });
   }
@@ -549,8 +333,9 @@ app.post("/api/subscription/create", async (req, res) => {
 });
 
 // 7. Humanize AI content via Gemini API
-app.post("/api/humanize", async (req, res) => {
-  const { text, userId, mode } = req.body;
+app.post("/api/humanize", authMiddleware, async (req, res) => {
+  const { text, mode } = req.body;
+  const userId = (req as any).secureUserId;
   if (!text || text.trim().length === 0) {
     return res.status(400).json({ error: "Aucun texte à transformer." });
   }
@@ -763,8 +548,8 @@ Renvoie ta réponse au format JSON contenant uniquement ces quatre clés :
 });
 
 // 8. History API
-app.get("/api/history/:userId", async (req, res) => {
-  const { userId } = req.params;
+app.get("/api/history", authMiddleware, async (req, res) => {
+  const userId = (req as any).secureUserId;
   
   if (isSupabaseConfigured) {
     try {

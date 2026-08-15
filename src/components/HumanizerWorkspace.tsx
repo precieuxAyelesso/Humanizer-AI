@@ -78,7 +78,11 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
   // Load history log items for user
   const loadHistory = async () => {
     try {
-      const response = await fetch(`/api/history/${user.uid}`);
+      const response = await fetch(`/api/history`, {
+        headers: {
+          "Authorization": `Bearer ${user.token}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setHistory(data);
@@ -110,7 +114,10 @@ export default function HumanizerWorkspace({ user, onLogout, onTriggerPremiumUpg
     try {
       const response = await fetch("/api/humanize", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${user.token}`
+        },
         body: JSON.stringify({
           text: inputText,
           userId: user.uid,

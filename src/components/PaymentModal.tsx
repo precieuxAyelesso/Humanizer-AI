@@ -91,9 +91,11 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
     try {
       const response = await fetch("/api/subscription/create", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${user.token}`
+        },
         body: JSON.stringify({
-          userId: user.uid,
           paymentMethod: paymentType,
           transactionRef: reference,
           amount: `${priceInfo.amount} ${priceInfo.symbol}`,
