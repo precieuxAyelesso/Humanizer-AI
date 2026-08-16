@@ -134,19 +134,16 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
                 }).join(''));
                 const jwt = JSON.parse(jsonPayload);
 
-                // Authenticate and retrieve full session info
-                const res = await fetch("/api/auth/google", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    name: jwt.name || jwt.email.split("@")[0],
-                    email: jwt.email,
-                    googleId: jwt.sub,
-                  }),
+                // Authenticate directly with Supabase using the Google ID token
+                const { error: signInError } = await supabase.auth.signInWithIdToken({
+                  provider: 'google',
+                  token: response.credential,
                 });
-                const apiData = await res.json();
-                if (!res.ok) throw new Error(apiData.error);
-                onLoginSuccess(apiData.user);
+
+                if (signInError) throw signInError;
+                
+                // Le onAuthStateChange (déjà configuré en dessous) va capter la connexion
+                // et appeler onLoginSuccess automatiquement.
               } catch (err: any) {
                 handleError(err.message || "Erreur de connexion Google.");
               } finally {
