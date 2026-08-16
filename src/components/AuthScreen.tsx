@@ -213,7 +213,7 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
           onLoginSuccess(userWithToken);
         } catch (err: any) {
           console.error("Error processing Supabase auth:", err);
-          handleError("Erreur lors de l'initialisation de la session sécurisée.");
+          handleError(err.message || "Erreur lors de l'initialisation de la session sécurisée.");
         }
       }
     });

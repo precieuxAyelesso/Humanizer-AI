@@ -190,7 +190,7 @@ app.post("/api/auth/supabase-callback", authMiddleware, async (req, res) => {
           is_premium: false,
           created_at: new Date().toISOString(),
         }, {
-          onConflict: "email", // If email exists, update the row
+          onConflict: "uid", // uid is the primary key with unique constraint, email is not
         })
         .select("*")
         .single();
