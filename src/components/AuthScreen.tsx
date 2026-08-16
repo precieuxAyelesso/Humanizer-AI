@@ -180,7 +180,8 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     if (!supabase) return;
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
+      // Only process actual sign-in events, not stale/initial sessions
+      if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") && session?.user) {
         try {
           // Fetch or create user profile in our database, securely passing the JWT
           const res = await fetch("/api/auth/supabase-callback", {
@@ -200,6 +201,12 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
 
           const data = await res.json();
           if (!res.ok) {
+            // If token is expired/invalid, clear the stale session silently
+            if (res.status === 401) {
+              console.warn("Session expired, signing out...");
+              await supabase.auth.signOut();
+              return;
+            }
             throw new Error(data.error);
           }
 
@@ -213,6 +220,11 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
           onLoginSuccess(userWithToken);
         } catch (err: any) {
           console.error("Error processing Supabase auth:", err);
+          // If it's likely a stale session issue, sign out silently
+          if (err.message?.includes("Non autorisé") || err.message?.includes("Jeton")) {
+            await supabase.auth.signOut();
+            return;
+          }
           handleError(err.message || "Erreur lors de l'initialisation de la session sécurisée.");
         }
       }
