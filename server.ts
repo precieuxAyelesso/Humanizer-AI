@@ -106,6 +106,14 @@ if (geminiApiKey) {
   console.warn("GEMINI_API_KEY not defined in environment.");
 }
 
+// Moneroo Payment Gateway Configuration
+const monerooSecretKey = process.env.MONEROO_SECRET_KEY || "";
+if (monerooSecretKey) {
+  console.log("[MONEROO] Clé secrète Moneroo configurée avec succès.");
+} else {
+  console.warn("[MONEROO] MONEROO_SECRET_KEY manquante. Les paiements ne fonctionneront pas.");
+}
+
 // 0. DB Status Check & Keep-Alive Ping Endpoint
 app.get("/api/db/status", async (req, res) => {
   let isAlive = isSupabaseConfigured;
@@ -258,7 +266,178 @@ app.post("/api/auth/supabase-callback", authMiddleware, async (req, res) => {
   }
 });
 
+// 5.5 Moneroo Payment: Initialize payment session
+app.post("/api/payment/initialize", authMiddleware, async (req, res) => {
+  const { amount, currency, description } = req.body;
+  const userId = (req as any).secureUserId;
 
+  if (!monerooSecretKey) {
+    return res.status(503).json({ error: "Le service de paiement n'est pas configuré." });
+  }
+
+  if (!amount || !currency) {
+    return res.status(400).json({ error: "Montant et devise requis." });
+  }
+
+  // Get user email from database
+  let userEmail = "";
+  let userName = "";
+  if (isSupabaseConfigured) {
+    try {
+      const { data } = await supabase.from("users").select("email, name").eq("uid", userId).single();
+      if (data) {
+        userEmail = data.email;
+        userName = data.name;
+      }
+    } catch (err) {
+      console.error("[MONEROO] Failed to fetch user info:", err);
+    }
+  }
+
+  try {
+    const appUrl = process.env.APP_URL || "https://humanizerai.space";
+    
+    const monerooResponse = await fetch("https://api.moneroo.io/v1/payments/initialize", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${monerooSecretKey}`,
+        "Accept": "application/json",
+      },
+      body: JSON.stringify({
+        amount: Math.round(Number(amount)),
+        currency: currency.toUpperCase(),
+        description: description || "Abonnement Premium Humanizer AI",
+        customer: {
+          email: userEmail || "client@humanizerai.space",
+          first_name: userName || "Client",
+          last_name: "HumanizerAI",
+        },
+        return_url: `${appUrl}?payment=callback&userId=${userId}`,
+        metadata: {
+          userId: userId,
+          plan: "premium_monthly",
+          amount: amount,
+          currency: currency,
+        },
+      }),
+    });
+
+    const monerooData = await monerooResponse.json();
+
+    if (!monerooResponse.ok) {
+      console.error("[MONEROO] API Error:", monerooData);
+      return res.status(monerooResponse.status).json({ 
+        error: monerooData.message || "Erreur lors de l'initialisation du paiement Moneroo." 
+      });
+    }
+
+    res.json({
+      checkout_url: monerooData.data?.checkout_url,
+      transaction_id: monerooData.data?.id,
+    });
+  } catch (err: any) {
+    console.error("[MONEROO] Initialize Error:", err);
+    return res.status(500).json({ error: `Erreur de paiement: ${err.message}` });
+  }
+});
+
+// 5.6 Moneroo Payment: Verify payment status after return
+app.get("/api/payment/verify/:transactionId", authMiddleware, async (req, res) => {
+  const { transactionId } = req.params;
+  const userId = (req as any).secureUserId;
+
+  if (!monerooSecretKey) {
+    return res.status(503).json({ error: "Le service de paiement n'est pas configuré." });
+  }
+
+  try {
+    const monerooResponse = await fetch(`https://api.moneroo.io/v1/payments/${transactionId}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${monerooSecretKey}`,
+        "Accept": "application/json",
+      },
+    });
+
+    const monerooData = await monerooResponse.json();
+
+    if (!monerooResponse.ok) {
+      console.error("[MONEROO] Verify Error:", monerooData);
+      return res.status(monerooResponse.status).json({ 
+        error: monerooData.message || "Erreur lors de la vérification du paiement." 
+      });
+    }
+
+    const paymentStatus = monerooData.data?.status;
+    const isSuccess = paymentStatus === "success" || paymentStatus === "completed";
+
+    if (isSuccess) {
+      // Upgrade user to premium
+      if (isSupabaseConfigured) {
+        const { error } = await supabase
+          .from("users")
+          .update({ is_premium: true })
+          .eq("uid", userId);
+        if (error) {
+          console.error("[MONEROO] Premium upgrade error:", error);
+          return res.status(500).json({ error: "Paiement réussi mais échec de l'activation premium." });
+        }
+      } else {
+        const users = readJSONFile(USERS_FILE, []);
+        const userIndex = users.findIndex((u: any) => u.uid === userId);
+        if (userIndex !== -1) {
+          users[userIndex].isPremium = true;
+          writeJSONFile(USERS_FILE, users);
+        }
+      }
+
+      // Get updated user data
+      let updatedUser: any = null;
+      if (isSupabaseConfigured) {
+        const { data } = await supabase.from("users").select("*").eq("uid", userId).single();
+        if (data) {
+          updatedUser = {
+            uid: data.uid,
+            name: data.name,
+            email: data.email,
+            phone: data.phone || "",
+            isSmsVerified: data.is_sms_verified,
+            isPremium: true,
+          };
+        }
+      } else {
+        const users = readJSONFile(USERS_FILE, []);
+        const u = users.find((u: any) => u.uid === userId);
+        if (u) {
+          updatedUser = {
+            uid: u.uid, name: u.name, email: u.email,
+            phone: u.phone || "", isSmsVerified: u.isSmsVerified, isPremium: true,
+          };
+        }
+      }
+
+      res.json({
+        status: "success",
+        message: "Paiement réussi ! Votre abonnement Premium est activé.",
+        user: updatedUser,
+        paymentDetails: {
+          ref: transactionId,
+          amount: monerooData.data?.amount,
+          method: "Moneroo",
+        },
+      });
+    } else {
+      res.json({
+        status: paymentStatus || "pending",
+        message: `Statut du paiement : ${paymentStatus || "en attente"}`,
+      });
+    }
+  } catch (err: any) {
+    console.error("[MONEROO] Verify Error:", err);
+    return res.status(500).json({ error: `Erreur de vérification: ${err.message}` });
+  }
+});
 
 // 6. Premium Subscriptions updates
 app.post("/api/subscription/create", authMiddleware, async (req, res) => {

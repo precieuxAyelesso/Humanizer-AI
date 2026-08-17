@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { CreditCard, Smartphone, Check, Shield, AlertCircle, Loader2, Sparkles } from "lucide-react";
+import { CreditCard, Smartphone, Check, Shield, AlertCircle, Loader2, Sparkles, ExternalLink } from "lucide-react";
 
 interface PaymentModalProps {
   user: any;
@@ -9,14 +9,6 @@ interface PaymentModalProps {
 }
 
 export default function PaymentModal({ user, onClose, onPaymentSuccess }: PaymentModalProps) {
-  const [method, setMethod] = useState<"momo" | "card" | "stripe">("momo");
-  const [operator, setOperator] = useState<"orange" | "mtn" | "moov" | "wave">("orange");
-  const [phone, setPhone] = useState(user.phone || "");
-  const [otp, setOtp] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvv, setCardCvv] = useState("");
-  const [stripeEmail, setStripeEmail] = useState(user.email || "");
   const [priceInfo, setPriceInfo] = useState({ amount: 1961, currency: "XOF", symbol: "F CFA" });
 
   useEffect(() => {
@@ -58,168 +50,63 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
     fetchGeoPricing();
   }, []);
 
-  // Load KKiaPay SDK dynamically
-  useEffect(() => {
-    const scriptId = "kkiapay-sdk-script";
-    if (!document.getElementById(scriptId)) {
-      const script = document.createElement("script");
-      script.id = scriptId;
-      script.src = "https://cdn.kkiapay.me/k.js";
-      script.async = true;
-      document.body.appendChild(script);
-    }
-  }, []);
-
-  // Interactive step simulation
-  // 'initial', 'processing', 'otp_required', 'success'
-  const [step, setStep] = useState<"initial" | "processing" | "otp_required" | "success">("initial");
+  // 'initial', 'processing', 'success'
+  const [step, setStep] = useState<"initial" | "processing" | "success">("initial");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [paymentReceipt, setPaymentReceipt] = useState<any>(null);
 
-  const mockMobileMoneyOperators = [
-    { id: "orange", name: "Orange Money", color: "bg-orange-500", border: "border-orange-200" },
-    { id: "mtn", name: "MTN Mobile Money", color: "bg-yellow-500", border: "border-yellow-200" },
-    { id: "moov", name: "Moov Money", color: "bg-blue-600", border: "border-blue-200" },
-    { id: "wave", name: "Wave", color: "bg-cyan-500", border: "border-cyan-200" },
-  ];
-
-  const handleCreateSubscription = async (paymentType: string, reference: string) => {
-    setLoading(true);
+  const handlePaymentSubmit = async (e: FormEvent) => {
+    e.preventDefault();
     setError("");
+    setLoading(true);
+    setStep("processing");
 
     try {
-      const response = await fetch("/api/subscription/create", {
+      // Call our backend to initialize a Moneroo payment session
+      const response = await fetch("/api/payment/initialize", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${user.token}`
+          "Authorization": `Bearer ${user.token}`,
         },
         body: JSON.stringify({
-          paymentMethod: paymentType,
-          transactionRef: reference,
-          amount: `${priceInfo.amount} ${priceInfo.symbol}`,
+          amount: priceInfo.amount,
+          currency: priceInfo.currency,
+          description: `Abonnement Premium Humanizer AI - ${priceInfo.amount} ${priceInfo.symbol}/mois`,
         }),
       });
 
       const data = await response.json();
+
       if (!response.ok) {
-        throw new Error(data.error || "L'activation de l'abonnement a échoué.");
+        throw new Error(data.error || "Erreur lors de l'initialisation du paiement.");
       }
 
-      setPaymentReceipt(data.paymentDetails);
-      setStep("success");
-      onPaymentSuccess(data.user);
+      if (data.checkout_url) {
+        // Save transaction ID for later verification
+        localStorage.setItem("moneroo_transaction_id", data.transaction_id);
+        // Redirect user to Moneroo hosted checkout page
+        window.location.href = data.checkout_url;
+      } else {
+        throw new Error("URL de paiement non reçue. Veuillez réessayer.");
+      }
     } catch (err: any) {
-      setError(err.message);
+      console.error("Payment initialization error:", err);
+      setError(err.message || "Erreur d'initialisation du paiement.");
       setStep("initial");
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePaymentSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    if (method === "momo" || method === "card") {
-      if (method === "momo" && !phone) {
-        return setError("Saisissez un numéro Mobile Money valide.");
-      }
-
-      setStep("processing");
-
-      try {
-        const win = window as any;
-        if (typeof win.openKkiapayWidget === "undefined") {
-          throw new Error(
-            "Le module de paiement KKiaPay n'a pas pu être chargé. Veuillez rafraîchir la page."
-          );
-        }
-
-        // Subscribe to success event
-        win.addSuccessListener(async (response: any) => {
-          console.log("KKiaPay payment successful:", response);
-          if (typeof win.closeKkiapayWidget === "function") {
-            win.closeKkiapayWidget();
-          }
-          const transactionId = response.transactionId;
-          await handleCreateSubscription(
-            method === "momo" ? `Mobile Money (KKiaPay)` : "Carte Bancaire (KKiaPay)",
-            transactionId
-          );
-        });
-
-        // Subscribe to failed/closed event
-        win.addFailedListener((err: any) => {
-          console.error("KKiaPay payment failed:", err);
-          if (typeof win.closeKkiapayWidget === "function") {
-            win.closeKkiapayWidget();
-          }
-          setError("Le paiement a échoué ou a été annulé par l'utilisateur.");
-          setStep("initial");
-        });
-
-        // Subscribe to close event
-        if (typeof win.addKkiapayCloseListener === "function") {
-          win.addKkiapayCloseListener(() => {
-            setStep("initial");
-          });
-        }
-
-        // Launch KKiaPay Widget overlay
-        const kkiapayKey = import.meta.env.VITE_KKIAPAY_PUBLIC_KEY;
-        if (!kkiapayKey) {
-          throw new Error(
-            "La clé de paiement publique KKiaPay n'est pas configurée. Veuillez contacter le support technique."
-          );
-        }
-        const isSandbox = import.meta.env.VITE_KKIAPAY_SANDBOX === "true";
-
-        win.openKkiapayWidget({
-          amount: priceInfo.amount,
-          position: "center",
-          key: kkiapayKey,
-          sandbox: isSandbox,
-          name: user.name || "Client HumanWriter",
-          email: user.email || "",
-          phone: method === "momo" ? phone : "",
-          theme: "#10b981", // Emerald green
-          data: JSON.stringify({
-            userId: user.uid,
-            price: priceInfo.amount,
-            currency: priceInfo.currency,
-          }),
-        });
-      } catch (err: any) {
-        console.error("KKiaPay launch error:", err);
-        setError(err.message || "Erreur d'initialisation du widget de paiement.");
-        setStep("initial");
-      }
-    } else if (method === "stripe") {
-      if (!stripeEmail) {
-        return setError("Adresse e-mail de facturation Stripe obligatoire.");
-      }
-      setStep("processing");
-
-      // Simulates secure official Stripe Checkout redirect
-      setTimeout(() => {
-        const ref = "STRIPE_CH_TXN_" + Math.floor(100000 + Math.random() * 900000);
-        handleCreateSubscription("Stripe Checkout Express", ref);
-      }, 2800);
-    }
-  };
-
-  const handleConfirmOtp = (e: FormEvent) => {
-    e.preventDefault();
-    if (!otp) return setError("Le code de confirmation OTP à 4 chiffres est requis.");
-
-    setStep("processing");
-    setTimeout(() => {
-      const ref = "ORANGE_OTP_TXN_" + Math.floor(100000 + Math.random() * 900000);
-      handleCreateSubscription("Orange Money + OTP", ref);
-    }, 2000);
-  };
+  // Features list for the premium offer
+  const premiumFeatures = [
+    { icon: "✍️", text: "Réécriture illimitée de textes IA" },
+    { icon: "⚡", text: "Traitement ultra-rapide avec Gemini" },
+    { icon: "🛡️", text: "Textes 100% indétectables" },
+    { icon: "📊", text: "Historique complet de vos textes" },
+  ];
 
   return (
     <div id="payment-modal-overlay" className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
@@ -269,7 +156,7 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
         <div className="p-4">
           <AnimatePresence mode="wait">
             
-            {/* Step 1: Selection Form */}
+            {/* Step 1: Payment Form */}
             {step === "initial" && (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -284,142 +171,69 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
                   </div>
                 )}
 
-                {/* Gateway Group Buttons Selector */}
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => setMethod("momo")}
-                    className={`py-2 px-1.5 rounded-xl border font-bold text-[11px] flex flex-col items-center space-y-1 transition-all cursor-pointer ${
-                      method === "momo"
-                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 shadow-md shadow-emerald-500/5"
-                        : "border-slate-200 bg-slate-50/50 hover:border-slate-300 text-slate-500"
-                    }`}
-                  >
-                    <Smartphone className="h-3.5 w-3.5" />
-                    <span>Mobile Money</span>
-                  </button>
-
-                  <button
-                    onClick={() => setMethod("card")}
-                    className={`py-2 px-1.5 rounded-xl border font-bold text-[11px] flex flex-col items-center space-y-1 transition-all cursor-pointer ${
-                      method === "card"
-                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 shadow-md shadow-emerald-500/5"
-                        : "border-slate-200 bg-slate-50/50 hover:border-slate-300 text-slate-500"
-                    }`}
-                  >
-                    <CreditCard className="h-3.5 w-3.5" />
-                    <span>Carte Visa/MC</span>
-                  </button>
-
-                  <button
-                    onClick={() => setMethod("stripe")}
-                    className={`py-2 px-1.5 rounded-xl border font-bold text-[11px] flex flex-col items-center space-y-1 transition-all cursor-pointer ${
-                      method === "stripe"
-                        ? "border-indigo-500 bg-indigo-500/10 text-indigo-650 shadow-md shadow-indigo-500/5"
-                        : "border-slate-200 bg-slate-50/50 hover:border-slate-300 text-slate-500"
-                    }`}
-                  >
-                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M13.998 2.006c-1.35 0-2.272.69-2.779 1.493-.45-.487-1.127-.852-1.921-.852-1.25 0-2.125.688-2.625 1.5V2.818H3.33v11.834h3.344V9.897c0-2.311 1.092-3.197 2.625-3.197.904 0 1.503.493 1.503 1.579v6.373h3.344V9.897c0-2.311 1.092-3.197 2.625-3.197.904 0 1.503.493 1.503 1.579v6.373h3.344V8.049c0-3.623-1.904-6.043-4.62-6.043z"/>
-                    </svg>
-                    <span>Stripe Pay</span>
-                  </button>
+                {/* Premium features grid */}
+                <div className="grid grid-cols-2 gap-2">
+                  {premiumFeatures.map((feature, i) => (
+                    <div key={i} className="flex items-start space-x-2 p-2.5 bg-slate-50/70 border border-slate-100 rounded-xl">
+                      <span className="text-sm">{feature.icon}</span>
+                      <span className="text-[10px] text-slate-600 font-semibold leading-snug">{feature.text}</span>
+                    </div>
+                  ))}
                 </div>
 
-                {/* Sub Forms bases on selected method */}
-                <form onSubmit={handlePaymentSubmit} className="space-y-4">
-                  
-                  {/* Mobile Money Sub Form */}
-                  {method === "momo" && (
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-slate-555 text-[10px] font-bold tracking-wider uppercase">Opérateur Mobile Money</label>
-                        <div className="grid grid-cols-4 gap-2">
-                          {mockMobileMoneyOperators.map((op) => (
-                            <button
-                              key={op.id}
-                              type="button"
-                              onClick={() => setOperator(op.id as any)}
-                              className={`py-1.5 px-1 rounded-xl border text-[10px] text-center font-bold transition-all truncate cursor-pointer ${
-                                operator === op.id
-                                  ? "border-emerald-500 bg-emerald-500/10 text-slate-900 ring-2 ring-emerald-500/10"
-                                  : "border-slate-200 bg-slate-50/50 text-slate-500 hover:border-slate-300"
-                              }`}
-                            >
-                              <div className={`h-2 w-2 rounded-full mx-auto mb-1 ${op.color} shadow-sm`} />
-                              {op.name.split(" ")[0]}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-slate-555 text-[9px] font-bold tracking-wider uppercase">Numéro de Téléphone Portefeuille</label>
-                        <input
-                          type="tel"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          placeholder="+225 07 43 21 09 87"
-                          className="w-full bg-slate-50/80 text-slate-800 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none font-semibold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
-                          required
-                        />
-                        <p className="text-[9px] text-slate-400 font-semibold">Spécifiez le numéro disposant des fonds (ex: Orange, MTN, Wave, Moov).</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Credit Card Sub Form (Visa/MC via KKiaPay) */}
-                  {method === "card" && (
-                    <div className="space-y-3 p-3 bg-emerald-500/[0.02] border border-emerald-500/15 rounded-xl font-sans">
-                      <div className="flex items-center space-x-1.5 text-xs text-emerald-600 font-bold mb-1">
-                        <Shield className="h-3.5 w-3.5" />
-                        <span>Paiement par Carte Bancaire via KKiaPay</span>
-                      </div>
-                      <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
-                        Vous allez être redirigé vers le widget de paiement sécurisé de KKiaPay pour saisir vos informations bancaires de manière 100% sécurisée.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Stripe Sub Form */}
-                  {method === "stripe" && (
-                    <div className="space-y-3 p-3 bg-indigo-500/[0.02] border border-indigo-500/15 rounded-xl font-sans">
-                      <div className="flex items-center space-x-1.5 text-xs text-indigo-600 font-bold mb-1">
-                        <Shield className="h-3.5 w-3.5" />
-                        <span>Paiement International via Stripe</span>
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <label className="text-slate-555 text-[9px] font-bold tracking-wider uppercase">Email de Facturation Stripe</label>
-                        <input
-                          type="email"
-                          value={stripeEmail}
-                          onChange={(e) => setStripeEmail(e.target.value)}
-                          placeholder="email@exemple.com"
-                          className="w-full bg-slate-50/80 text-slate-855 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none font-semibold focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all"
-                          required
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Terms / Security Badge */}
-                  <div className="flex items-center space-x-2 text-[9px] text-slate-400 font-bold my-3 bg-slate-50/50 p-2 rounded-lg border border-slate-100 shadow-inner">
-                    <Shield className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-                    <span>Paiement sécurisé SSL conforme PCI-DSS. Annulable à tout moment.</span>
+                {/* Moneroo Payment Info */}
+                <div className="space-y-3 p-3 bg-emerald-500/[0.03] border border-emerald-500/15 rounded-xl font-sans">
+                  <div className="flex items-center space-x-1.5 text-xs text-emerald-600 font-bold mb-1">
+                    <Shield className="h-3.5 w-3.5" />
+                    <span>Paiement sécurisé via Moneroo</span>
                   </div>
+                  <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
+                    Vous serez redirigé vers la plateforme de paiement sécurisée Moneroo. 
+                    Payez par <strong>Mobile Money</strong> (Orange, MTN, Wave, Moov) ou par <strong>Carte Bancaire</strong> (Visa, Mastercard).
+                  </p>
+                  <div className="flex items-center space-x-3 mt-2">
+                    <div className="flex items-center space-x-1.5">
+                      <Smartphone className="h-3 w-3 text-slate-400" />
+                      <span className="text-[9px] text-slate-400 font-bold">Mobile Money</span>
+                    </div>
+                    <div className="w-px h-3 bg-slate-200" />
+                    <div className="flex items-center space-x-1.5">
+                      <CreditCard className="h-3 w-3 text-slate-400" />
+                      <span className="text-[9px] text-slate-400 font-bold">Visa / Mastercard</span>
+                    </div>
+                  </div>
+                </div>
 
-                  {/* Final pay trigger button */}
+                {/* Terms / Security Badge */}
+                <div className="flex items-center space-x-2 text-[9px] text-slate-400 font-bold my-3 bg-slate-50/50 p-2 rounded-lg border border-slate-100 shadow-inner">
+                  <Shield className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  <span>Paiement sécurisé SSL conforme PCI-DSS. Annulable à tout moment.</span>
+                </div>
+
+                {/* Final pay trigger button */}
+                <form onSubmit={handlePaymentSubmit}>
                   <button
                     type="submit"
-                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold rounded-xl py-2.5 flex items-center justify-center space-x-2 shadow-lg shadow-emerald-500/15 transition-all cursor-pointer active:scale-98"
+                    disabled={loading}
+                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold rounded-xl py-2.5 flex items-center justify-center space-x-2 shadow-lg shadow-emerald-500/15 transition-all cursor-pointer active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    <span>Payer {priceInfo.amount} {priceInfo.symbol}</span>
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Préparation du paiement...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ExternalLink className="h-4 w-4" />
+                        <span>Payer {priceInfo.amount} {priceInfo.symbol}</span>
+                      </>
+                    )}
                   </button>
                 </form>
               </motion.div>
             )}
 
-            {/* Step 2: Processing Payment state */}
+            {/* Step 2: Processing / Redirecting */}
             {step === "processing" && (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -432,56 +246,15 @@ export default function PaymentModal({ user, onClose, onPaymentSuccess }: Paymen
                   <Loader2 className="h-10 w-10 text-emerald-500 animate-spin relative" />
                 </div>
                 <div className="text-center space-y-2">
-                  <h4 className="font-extrabold text-slate-800 text-sm">Traitement de l'autorisation sécurisée...</h4>
+                  <h4 className="font-extrabold text-slate-800 text-sm">Redirection vers Moneroo...</h4>
                   <p className="text-[10px] text-slate-500 max-w-xs mx-auto leading-relaxed font-semibold">
-                    {method === "momo" 
-                      ? "Veuillez valider l'invitation de débit reçue automatiquement par push USSD sur votre mobile et confirmer avec votre code secret PIN." 
-                      : "Nous contactons votre banque pour approuver la transaction. Ne fermez pas cette fenêtre."
-                    }
+                    Nous préparons votre session de paiement sécurisée. Vous allez être redirigé automatiquement dans quelques secondes.
                   </p>
                 </div>
               </motion.div>
             )}
 
-            {/* Step 3: Orange Money OTP code requirement */}
-            {step === "otp_required" && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="space-y-4"
-              >
-                <div className="p-4 bg-orange-500/10 border border-orange-500/25 rounded-2xl space-y-2">
-                  <div className="flex items-center space-x-2 text-orange-600 font-bold text-xs">
-                    <AlertCircle className="h-4 w-4 text-orange-650" />
-                    <span>Orange Money OTP Obligatoire</span>
-                  </div>
-                  <p className="text-[10px] text-slate-650 leading-relaxed font-bold">Pour valider le paiement, tapez <span className="bg-orange-500/20 text-orange-750 px-1.5 py-0.5 rounded font-black font-mono">#144*82#</span> sur votre mobile pour générer un code d'autorisation temporaire à 4 chiffres.</p>
-                </div>
-
-                <form onSubmit={handleConfirmOtp} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-slate-555 text-[10px] font-bold tracking-wider uppercase block text-center">Code d'autorisation OTP reçu</label>
-                    <input
-                      type="text"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
-                      placeholder="Ex: 8439"
-                      maxLength={4}
-                      className="w-full bg-slate-50/80 text-slate-850 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none text-center tracking-[0.25em] font-bold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all font-mono"
-                      required
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="w-full bg-orange-600 hover:bg-orange-700 text-white font-extrabold rounded-xl py-3.5 transition-all cursor-pointer active:scale-98"
-                  >
-                    Confirmer l'opération
-                  </button>
-                </form>
-              </motion.div>
-            )}
-
-            {/* Step 4: Success configuration */}
+            {/* Step 3: Success */}
             {step === "success" && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}

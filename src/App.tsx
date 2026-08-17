@@ -38,17 +38,79 @@ export default function App() {
     localStorage.setItem("humanizer_ai_session", JSON.stringify(loggedInUser));
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setUser(null);
     setShowAuth(false);
     localStorage.removeItem("humanizer_ai_session");
+    
+    // Prevent Google One Tap from auto-logging in immediately
+    if (typeof window !== "undefined" && (window as any).google?.accounts?.id) {
+      try {
+        (window as any).google.accounts.id.disableAutoSelect();
+      } catch (err) {
+        console.error("Failed to disable Google auto-select", err);
+      }
+    }
+
+    // Sign out from Supabase
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_KEY;
+    if (supabaseUrl && supabaseKey) {
+      try {
+        const { createClient } = await import("@supabase/supabase-js");
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.error("Failed to sign out from Supabase", err);
+      }
+    }
   };
 
   const handlePaymentSuccess = (updatedUser: any) => {
-    setUser(updatedUser);
-    localStorage.setItem("humanizer_ai_session", JSON.stringify(updatedUser));
+    // Preserve the token from the current session
+    const tokenToKeep = user?.token || updatedUser?.token;
+    const userWithToken = { ...updatedUser, token: tokenToKeep };
+    setUser(userWithToken);
+    localStorage.setItem("humanizer_ai_session", JSON.stringify(userWithToken));
   };
 
+  // Handle return from Moneroo payment checkout
+  const [paymentVerifying, setPaymentVerifying] = useState(false);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isPaymentCallback = urlParams.get("payment") === "callback";
+    const paymentId = urlParams.get("paymentId");
+    const transactionId = localStorage.getItem("moneroo_transaction_id");
+
+    if (isPaymentCallback && (paymentId || transactionId) && user?.token) {
+      const txnId = paymentId || transactionId;
+      setPaymentVerifying(true);
+
+      fetch(`/api/payment/verify/${txnId}`, {
+        headers: {
+          "Authorization": `Bearer ${user.token}`,
+        },
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.status === "success" && data.user) {
+            handlePaymentSuccess(data.user);
+            setIsPaymentOpen(false);
+          }
+          // Clean up
+          localStorage.removeItem("moneroo_transaction_id");
+          // Remove query params from URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        })
+        .catch((err) => {
+          console.error("Payment verification error:", err);
+        })
+        .finally(() => {
+          setPaymentVerifying(false);
+        });
+    }
+  }, [user?.token]);
   if (!authChecked) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-brand-bg text-slate-800 space-y-4">
